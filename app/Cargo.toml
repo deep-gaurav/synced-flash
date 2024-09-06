@@ -34,6 +34,8 @@ ruffle_render_webgl = { workspace = true, optional = true }
 ruffle_render_wgpu = { workspace = true, optional = true }
 ruffle_video_software = { workspace = true, optional = true }
 ruffle_core = { workspace = true, optional = true }
+
+base64.workspace = true
 chrono = { workspace = true, features = ["wasmbind", "clock"] }
 
 url.workspace = true
@@ -46,12 +48,12 @@ hydrate = [
     "leptos_meta/hydrate",
     "leptos_router/hydrate",
     "canvas",
-    "webgl",
-    "wgpu-webgl",
-    "webgpu",
+    # "webgl",
+    # "wgpu-webgl",
+    # "webgpu",
     "ruffle_web_common",
     "ruffle_render",
-    "ruffle_video_software",
+    # "ruffle_video_software",
     "ruffle_core",
 ]
 ssr = [

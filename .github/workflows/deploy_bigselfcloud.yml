@@ -75,6 +75,6 @@ jobs:
 
     - name: Push To SelfCloud
       run: |
-        curl --location --fail --show-error 'https://bigcloud.deepwith.in/cloud/image/push' --form 'project_id="1c167755-6fc3-44fa-b538-9a5d75374a60"' --form "token=$SELFCLOUD_TOKEN" --form 'image=@"syncedflash.tar.gz"'
+        curl --location --fail --show-error 'https://bigcloud.deepwith.in/cloud/image/push' --form 'project_id="d031a3e3-7d3a-4871-9da1-5d6c720ad7f8"' --form "token=$SELFCLOUD_TOKEN" --form 'image=@"syncedflash.tar.gz"'
       env:
         SELFCLOUD_TOKEN: ${{ secrets.BIGCLOUD_TOKEN }}

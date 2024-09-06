@@ -6,7 +6,9 @@ use wasm_bindgen::{JsCast, UnwrapThrowExt};
 use web_sys::{js_sys::Uint8Array, Blob};
 
 use crate::{
-    components::{chatbox::ChatBox, player::Player, room_info::RoomInfo},
+    components::{
+        chatbox::ChatBox, player::Player, room_info::RoomInfo, virtual_buttons::VirtualButtons,
+    },
     networking::room_manager::RoomManager,
 };
 
@@ -29,19 +31,22 @@ pub fn RoomPage() -> impl IntoView {
     let (is_csr, set_is_csr) = create_signal(false);
     create_effect(move |_| set_is_csr.set(true));
 
+    let (keyevent_rx, keyevent_tx) = create_signal(None);
+
     view! {
         {move || {
             if let Ok(RoomParam { id: Some(room_id) }) = params.get() {
                 if !room_id.is_empty() {
                     view! {
                         <Title text=format!("Room {room_id}") />
-                        <Player  swf_data=swf_data/>
+                        <Player  swf_data=swf_data key_event_rx=keyevent_rx key_event_tx=keyevent_tx/>
                         {
                             move || {
                                 if is_csr.get(){
                                     view! {
                                         <RoomInfo />
                                         <ChatBox />
+                                        <VirtualButtons event_sender=keyevent_tx />
                                     }.into_view()
                                 }else {
                                     view! {}.into_view()

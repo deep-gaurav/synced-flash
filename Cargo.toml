@@ -71,6 +71,7 @@ chrono = { version = "0.4.38", default-features = false }
 
 url = "2.5.2"
 wasm-bindgen-futures = "0.4.43"
+base64 = "0.22.1"
 
 [workspace.dependencies.ruffle_core]
 git = "https://github.com/deep-gaurav/ruffle.git"
@@ -92,6 +93,7 @@ features = [
     "Screen",
     "ScreenOrientation",
     "OrientationLockType",
+    "Storage",
 ]
 
 # See https://github.com/akesson/cargo-leptos for documentation of all the parameters.

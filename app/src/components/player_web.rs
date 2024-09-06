@@ -7,21 +7,32 @@ use std::{
 use leptos::*;
 use leptos_use::use_raf_fn;
 use ruffle_core::{
-    backend::log::LogBackend, compatibility_rules::CompatibilityRules, tag_utils::SwfMovie, Player,
-    PlayerBuilder, PlayerRuntime, SandboxType, StageAlign, StageScaleMode, ViewportDimensions,
+    backend::{audio::NullAudioBackend, log::LogBackend, storage::MemoryStorageBackend},
+    compatibility_rules::CompatibilityRules,
+    events::KeyCode,
+    tag_utils::SwfMovie,
+    Player, PlayerBuilder, PlayerRuntime, SandboxType, StageAlign, StageScaleMode,
+    ViewportDimensions,
 };
 use ruffle_render::{backend::RenderBackend, quality::StageQuality};
-use ruffle_video_software::backend::SoftwareVideoBackend;
 use std::error::Error;
 use tracing::{info, warn};
 use url::Url;
 use wasm_bindgen::JsValue;
 use web_sys::js_sys;
 
+use base64::prelude::BASE64_STANDARD;
+use base64::Engine;
+use ruffle_core::backend::storage::StorageBackend;
+use web_sys::Storage;
+
+use super::virtual_buttons::{Key, KeyEvent};
+
 #[component]
 pub fn PlayerWeb(
     canvas_ref: NodeRef<leptos::html::Canvas>,
     swf_data: ReadSignal<Option<(String, Vec<u8>)>>,
+    key_event_rx: ReadSignal<Option<KeyEvent>>,
 ) -> impl IntoView {
     let (player, set_player) = create_signal(Option::<Arc<Mutex<ruffle_core::Player>>>::None);
     let (timestamp, set_timestamp) = create_signal(None);
@@ -43,6 +54,20 @@ pub fn PlayerWeb(
             }
         }
     });
+
+    create_effect(move |_| {
+        if let Some(player) = player.get() {
+            if let Some(event) = key_event_rx.get() {
+                if let Ok(player) = &mut player.lock() {
+                    let ruffleevent = event.ruffle_event();
+                    // info!("Sending event {ruffleevent:?}");
+                    // info!("Is mouse in stage {}", player.mouse_in_stage());
+                    let is_handled = player.handle_event(ruffleevent);
+                    // info!("Is handled {is_handled}")
+                }
+            }
+        }
+    });
     create_effect(move |_| {
         if player.get().is_some() {
             return;
@@ -55,11 +80,12 @@ pub fn PlayerWeb(
             leptos::spawn_local(async move {
                 let rendere_backend = create_renderer(canvas_element, quality).await;
                 if let Ok(renderer) = rendere_backend {
-                    let player_builder = PlayerBuilder::new()
+                    let mut player_builder = PlayerBuilder::new()
+                        .with_storage(Box::new(MemoryStorageBackend::new()))
+                        .with_audio(NullAudioBackend::new())
                         .with_boxed_renderer(renderer)
                         .with_log(WebLogBackend::new())
                         // .with_ui(ui::WebUiBackend::new(js_player.clone(), &canvas))
-                        .with_video(SoftwareVideoBackend::new())
                         .with_letterbox(ruffle_core::config::Letterbox::Fullscreen)
                         .with_max_execution_duration(Duration::from_secs_f64(15.0))
                         .with_player_version(None)
@@ -71,8 +97,17 @@ pub fn PlayerWeb(
                         .with_frame_rate(None)
                         // // FIXME - should this be configurable?
                         .with_sandbox_type(SandboxType::Remote)
-                        .with_page_url(window().location().href().ok())
-                        .build();
+                        .with_page_url(window().location().href().ok());
+                    #[cfg(feature = "ruffle_video_software")]
+                    {
+                        use ruffle_video_software::backend::SoftwareVideoBackend;
+                        player_builder = player_builder.with_video(SoftwareVideoBackend::new());
+                    }
+
+                    let player_builder = player_builder.build();
+                    if let Ok(player) = &mut player_builder.lock() {
+                        player.set_window_mode("window");
+                    }
                     set_player.set(Some(player_builder));
                 }
             });
@@ -289,4 +324,86 @@ pub fn load_swf(data: &[u8], name: &str, player: Arc<Mutex<Player>>) -> Result<(
         uc.replace_root_movie(movie);
     });
     Ok(())
+}
+
+impl Key {
+    pub fn ruffle_key(&self) -> KeyCode {
+        match self {
+            Key::UpArrow => KeyCode::UP,
+            Key::DownArrow => KeyCode::DOWN,
+            Key::LeftArrow => KeyCode::LEFT,
+            Key::RightArrow => KeyCode::DOWN,
+        }
+    }
+}
+
+impl KeyEvent {
+    pub fn ruffle_event(&self) -> ruffle_core::events::PlayerEvent {
+        match self {
+            // KeyEvent::Down(_) => ruffle_core::PlayerEvent::MouseDown {
+            //     x: 0.0,
+            //     y: 0.0,
+            //     button: ruffle_core::events::MouseButton::Left,
+            //     index: None,
+            // },
+            // KeyEvent::Up(_) => ruffle_core::PlayerEvent::MouseUp {
+            //     x: 0.0,
+            //     y: 0.0,
+            //     button: ruffle_core::events::MouseButton::Left,
+            //     // index: None,
+            // },
+            KeyEvent::Down(key) => ruffle_core::PlayerEvent::KeyDown {
+                key_code: key.ruffle_key(),
+                key_char: None,
+            },
+            KeyEvent::Up(key) => ruffle_core::PlayerEvent::KeyUp {
+                key_code: key.ruffle_key(),
+                key_char: None,
+            },
+            KeyEvent::MouseMove(x, y) => ruffle_core::PlayerEvent::MouseMove { x: *x, y: *y },
+            KeyEvent::MouseDown(x, y) => ruffle_core::PlayerEvent::MouseDown {
+                x: *x,
+                y: *y,
+                button: ruffle_core::events::MouseButton::Left,
+                index: None,
+            },
+            KeyEvent::MouseUp(x, y) => ruffle_core::PlayerEvent::MouseUp {
+                x: *x,
+                y: *y,
+                button: ruffle_core::events::MouseButton::Left,
+            },
+        }
+    }
+}
+
+pub struct LocalStorageBackend {
+    storage: Storage,
+}
+
+impl LocalStorageBackend {
+    pub(crate) fn new(storage: Storage) -> Self {
+        LocalStorageBackend { storage }
+    }
+}
+
+impl StorageBackend for LocalStorageBackend {
+    fn get(&self, name: &str) -> Option<Vec<u8>> {
+        if let Ok(Some(data)) = self.storage.get(name) {
+            if let Ok(data) = BASE64_STANDARD.decode(data) {
+                return Some(data);
+            }
+        }
+
+        None
+    }
+
+    fn put(&mut self, name: &str, value: &[u8]) -> bool {
+        self.storage
+            .set(name, &BASE64_STANDARD.encode(value))
+            .is_ok()
+    }
+
+    fn remove_key(&mut self, name: &str) {
+        let _ = self.storage.delete(name);
+    }
 }
