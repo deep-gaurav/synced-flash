@@ -26,9 +26,34 @@ uuid.workspace = true
 wasm-bindgen.workspace = true
 web-sys.workspace = true
 
+
+ruffle_render_canvas = { workspace = true, optional = true }
+ruffle_web_common = { workspace = true, optional = true }
+ruffle_render = { workspace = true, optional = true }
+ruffle_render_webgl = { workspace = true, optional = true }
+ruffle_render_wgpu = { workspace = true, optional = true }
+ruffle_video_software = { workspace = true, optional = true }
+ruffle_core = { workspace = true, optional = true }
+chrono = { workspace = true, features = ["wasmbind", "clock"] }
+
+url.workspace = true
+wasm-bindgen-futures.workspace = true
+
 [features]
 default = []
-hydrate = ["leptos/hydrate", "leptos_meta/hydrate", "leptos_router/hydrate"]
+hydrate = [
+    "leptos/hydrate",
+    "leptos_meta/hydrate",
+    "leptos_router/hydrate",
+    "canvas",
+    "webgl",
+    "wgpu-webgl",
+    "webgpu",
+    "ruffle_web_common",
+    "ruffle_render",
+    "ruffle_video_software",
+    "ruffle_core",
+]
 ssr = [
     "leptos/ssr",
     "leptos_meta/ssr",
@@ -36,3 +61,15 @@ ssr = [
     "dep:leptos_axum",
     "leptos-use/ssr",
 ]
+
+# core features
+avm_debug = ["ruffle_core/avm_debug"]
+lzma = ["ruffle_core/lzma"]
+jpegxr = ["ruffle_core/jpegxr"]
+
+# web features
+canvas = ["ruffle_render_canvas"]
+webgl = ["ruffle_render_webgl"]
+webgpu = ["ruffle_render_wgpu"]
+wgpu-webgl = ["ruffle_render_wgpu", "ruffle_render_wgpu/webgl"]
+profiling = []

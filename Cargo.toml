@@ -61,6 +61,29 @@ codee = { version = "0.2.0", features = ["bincode_serde"] }
 futures = "0.3"
 unicase = "2.7.0"
 
+ruffle_render_canvas = { git = "https://github.com/deep-gaurav/ruffle.git" }
+ruffle_web_common = { git = "https://github.com/deep-gaurav/ruffle.git" }
+ruffle_render = { git = "https://github.com/deep-gaurav/ruffle.git" }
+ruffle_render_webgl = { git = "https://github.com/deep-gaurav/ruffle.git" }
+ruffle_render_wgpu = { git = "https://github.com/deep-gaurav/ruffle.git" }
+ruffle_video_software = { git = "https://github.com/deep-gaurav/ruffle.git" }
+chrono = { version = "0.4.38", default-features = false }
+
+url = "2.5.2"
+wasm-bindgen-futures = "0.4.43"
+
+[workspace.dependencies.ruffle_core]
+git = "https://github.com/deep-gaurav/ruffle.git"
+features = [
+    "audio",
+    "mp3",
+    "nellymoser",
+    "default_compatibility_rules",
+    "default_font",
+    "serde",
+]
+
+
 [workspace.dependencies.web-sys]
 version = "0.3.70"
 features = [
@@ -77,9 +100,9 @@ features = [
 # that are used together frontend (lib) & server (bin)
 [[workspace.metadata.leptos]]
 # this name is used for the wasm, js and css file names
-name = "syncedcrt"
+name = "syncedflash"
 
-output-name = "syncedcrt"
+output-name = "syncedflash"
 
 # the package in the workspace that contains the server binary (binary crate)
 bin-package = "server"
