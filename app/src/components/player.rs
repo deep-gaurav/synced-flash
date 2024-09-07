@@ -1,6 +1,9 @@
 use leptos::*;
+use leptos_use::{use_event_listener_with_options, UseEventListenerOptions};
 use tracing::info;
-use web_sys::{js_sys::Uint8Array, Blob, DomRect, HtmlInputElement};
+use web_sys::{
+    js_sys::Uint8Array, Blob, DomRect, HtmlCanvasElement, HtmlElement, HtmlInputElement,
+};
 
 use super::virtual_buttons::KeyEvent;
 
@@ -15,6 +18,78 @@ pub fn Player(
 
     create_effect(move |_| {
         set_is_web.set(true);
+    });
+
+    create_effect(move |_| {
+        if let Some(canvas) = canvas_ref.get() {
+            let el: &HtmlElement = canvas.as_ref();
+            let el_html: HtmlElement = el.clone();
+            let _ = use_event_listener_with_options(
+                el_html.clone(),
+                leptos::ev::touchstart,
+                move |ev| {
+                    if let Some(canvas) = canvas_ref.get_untracked() {
+                        if let Some(touch) = ev.target_touches().item(0) {
+                            let dpr = window().device_pixel_ratio();
+
+                            let rect = canvas.get_bounding_client_rect();
+                            let x = f64::from(touch.client_x()) - rect.left();
+                            let y = f64::from(touch.client_y()) - rect.top();
+                            ev.prevent_default();
+
+                            if is_point_in_rect((x, y), rect) {
+                                key_event_tx.set(Some(KeyEvent::MouseDown(x * dpr, y * dpr)));
+                            }
+                        }
+                    }
+                },
+                UseEventListenerOptions::default().passive(false),
+            );
+
+            let _ = use_event_listener_with_options(
+                el_html.clone(),
+                leptos::ev::touchend,
+                move |ev| {
+                    if let Some(canvas) = canvas_ref.get_untracked() {
+                        if let Some(touch) = ev.target_touches().item(0) {
+                            let dpr = window().device_pixel_ratio();
+
+                            let rect = canvas.get_bounding_client_rect();
+                            let x = f64::from(touch.client_x()) - rect.left();
+                            let y = f64::from(touch.client_y()) - rect.top();
+                            ev.prevent_default();
+
+                            if is_point_in_rect((x, y), rect) {
+                                key_event_tx.set(Some(KeyEvent::MouseUp(x * dpr, y * dpr)));
+                            }
+                        }
+                    }
+                },
+                UseEventListenerOptions::default().passive(false),
+            );
+
+            let _ = use_event_listener_with_options(
+                el_html,
+                leptos::ev::touchmove,
+                move |ev| {
+                    if let Some(canvas) = canvas_ref.get_untracked() {
+                        if let Some(touch) = ev.target_touches().item(0) {
+                            let dpr = window().device_pixel_ratio();
+
+                            let rect = canvas.get_bounding_client_rect();
+                            let x = f64::from(touch.client_x()) - rect.left();
+                            let y = f64::from(touch.client_y()) - rect.top();
+                            ev.prevent_default();
+
+                            if is_point_in_rect((x, y), rect) {
+                                key_event_tx.set(Some(KeyEvent::MouseMove(x * dpr, y * dpr)));
+                            }
+                        }
+                    }
+                },
+                UseEventListenerOptions::default().passive(false),
+            );
+        }
     });
     view! {
         <canvas ref=canvas_ref class="h-full w-full"
@@ -31,60 +106,6 @@ pub fn Player(
                 let dpr = window().device_pixel_ratio();
                 key_event_tx.set(Some(KeyEvent::MouseUp(f64::from(ev.offset_x())*dpr, f64::from(ev.offset_y())*dpr)));
                 key_event_tx.set(Some(KeyEvent::MouseMove(f64::from(ev.offset_x())*dpr, f64::from(ev.offset_y())*dpr)));
-            }
-            on:touchstart=move|ev| {
-
-                if let Some(canvas) = canvas_ref.get_untracked(){
-                    if let Some(touch) = ev.target_touches().item(0) {
-                        let dpr = window().device_pixel_ratio();
-
-                        let rect = canvas.get_bounding_client_rect();
-                        let x = f64::from(touch.client_x()) - rect.left();
-                        let y = f64::from(touch.client_y()) - rect.top();
-                        ev.prevent_default();
-
-                        if is_point_in_rect((x,y), rect) {
-                            key_event_tx.set(Some(KeyEvent::MouseDown(x*dpr, y*dpr)));
-                        }
-                    }
-                }
-            }
-
-            on:touchend=move|ev| {
-
-                if let Some(canvas) = canvas_ref.get_untracked(){
-                    if let Some(touch) = ev.target_touches().item(0) {
-                        let dpr = window().device_pixel_ratio();
-
-                        let rect = canvas.get_bounding_client_rect();
-                        let x = f64::from(touch.client_x()) - rect.left();
-                        let y = f64::from(touch.client_y()) - rect.top();
-                        ev.prevent_default();
-
-                        if is_point_in_rect((x,y), rect) {
-                            key_event_tx.set(Some(KeyEvent::MouseUp(x*dpr, y*dpr)));
-                        }
-                    }
-                }
-            }
-
-            on:touchmove=move|ev| {
-
-                if let Some(canvas) = canvas_ref.get_untracked(){
-                    if let Some(touch) = ev.target_touches().item(0) {
-                        let dpr = window().device_pixel_ratio();
-
-                        let rect = canvas.get_bounding_client_rect();
-                        let x = f64::from(touch.client_x()) - rect.left();
-                        let y = f64::from(touch.client_y()) - rect.top();
-                        ev.prevent_default();
-
-
-                        if is_point_in_rect((x,y), rect) {
-                            key_event_tx.set(Some(KeyEvent::MouseMove(x*dpr, y*dpr)));
-                        }
-                    }
-                }
             }
 
         ></canvas>
