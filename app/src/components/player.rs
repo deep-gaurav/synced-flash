@@ -33,7 +33,6 @@ pub fn Player(
                 key_event_tx.set(Some(KeyEvent::MouseMove(f64::from(ev.offset_x())*dpr, f64::from(ev.offset_y())*dpr)));
             }
             on:touchstart=move|ev| {
-                ev.prevent_default();
 
                 if let Some(canvas) = canvas_ref.get_untracked(){
                     if let Some(touch) = ev.target_touches().item(0) {
@@ -42,6 +41,7 @@ pub fn Player(
                         let rect = canvas.get_bounding_client_rect();
                         let x = f64::from(touch.client_x()) - rect.left();
                         let y = f64::from(touch.client_y()) - rect.top();
+                        ev.prevent_default();
 
                         if is_point_in_rect((x,y), rect) {
                             key_event_tx.set(Some(KeyEvent::MouseDown(x*dpr, y*dpr)));
@@ -51,7 +51,6 @@ pub fn Player(
             }
 
             on:touchend=move|ev| {
-                ev.prevent_default();
 
                 if let Some(canvas) = canvas_ref.get_untracked(){
                     if let Some(touch) = ev.target_touches().item(0) {
@@ -60,17 +59,16 @@ pub fn Player(
                         let rect = canvas.get_bounding_client_rect();
                         let x = f64::from(touch.client_x()) - rect.left();
                         let y = f64::from(touch.client_y()) - rect.top();
+                        ev.prevent_default();
 
                         if is_point_in_rect((x,y), rect) {
                             key_event_tx.set(Some(KeyEvent::MouseUp(x*dpr, y*dpr)));
-                            key_event_tx.set(Some(KeyEvent::MouseMove(x*dpr, y*dpr)));
                         }
                     }
                 }
             }
 
             on:touchmove=move|ev| {
-                ev.prevent_default();
 
                 if let Some(canvas) = canvas_ref.get_untracked(){
                     if let Some(touch) = ev.target_touches().item(0) {
@@ -79,6 +77,8 @@ pub fn Player(
                         let rect = canvas.get_bounding_client_rect();
                         let x = f64::from(touch.client_x()) - rect.left();
                         let y = f64::from(touch.client_y()) - rect.top();
+                        ev.prevent_default();
+
 
                         if is_point_in_rect((x,y), rect) {
                             key_event_tx.set(Some(KeyEvent::MouseMove(x*dpr, y*dpr)));

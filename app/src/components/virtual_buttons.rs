@@ -122,7 +122,7 @@ pub fn VirtualButtons(event_sender: WriteSignal<Option<KeyEvent>>) -> impl IntoV
                                                 }
                                                 on:touchend=move|ev|{
                                                     ev.prevent_default();
-                                                    // event_sender.set(Some(KeyEvent::Up(k.key)))
+                                                    event_sender.set(Some(KeyEvent::Up(k.key)))
                                                 }
                                                 on:mousedown=move|_|{
                                                     event_sender.set(Some(KeyEvent::Down(k.key)));
