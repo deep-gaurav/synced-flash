@@ -1,4 +1,5 @@
 use leptos::*;
+use tracing::info;
 
 use crate::components::portal::Portal;
 use crate::MountPoints;
@@ -110,6 +111,19 @@ pub fn VirtualButtons(event_sender: WriteSignal<Option<KeyEvent>>) -> impl IntoV
                                                 type="button"
                                                 class="border border-white absolute bg-white/50 text-lg flex items-center justify-center pointer-events-auto"
                                                 style=format!("top:{}%; left:{}%; height:{}%; width:{}%;", k.top, k.left, k.height, k.width)
+                                                // on:click=move|_| {
+                                                //     event_sender.set(Some(KeyEvent::Down(k.key)));
+                                                //     event_sender.set(Some(KeyEvent::Up(k.key)))
+                                                // }
+
+                                                on:touchstart=move|ev|{
+                                                    ev.prevent_default();
+                                                    event_sender.set(Some(KeyEvent::Down(k.key)));
+                                                }
+                                                on:touchend=move|ev|{
+                                                    ev.prevent_default();
+                                                    // event_sender.set(Some(KeyEvent::Up(k.key)))
+                                                }
                                                 on:mousedown=move|_|{
                                                     event_sender.set(Some(KeyEvent::Down(k.key)));
                                                 }

@@ -1,6 +1,6 @@
 use leptos::*;
 use tracing::info;
-use web_sys::{js_sys::Uint8Array, Blob, HtmlInputElement};
+use web_sys::{js_sys::Uint8Array, Blob, DomRect, HtmlInputElement};
 
 use super::virtual_buttons::KeyEvent;
 
@@ -30,7 +30,63 @@ pub fn Player(
             on:mouseup=move|ev|{
                 let dpr = window().device_pixel_ratio();
                 key_event_tx.set(Some(KeyEvent::MouseUp(f64::from(ev.offset_x())*dpr, f64::from(ev.offset_y())*dpr)));
+                key_event_tx.set(Some(KeyEvent::MouseMove(f64::from(ev.offset_x())*dpr, f64::from(ev.offset_y())*dpr)));
             }
+            on:touchstart=move|ev| {
+                ev.prevent_default();
+
+                if let Some(canvas) = canvas_ref.get_untracked(){
+                    if let Some(touch) = ev.target_touches().item(0) {
+                        let dpr = window().device_pixel_ratio();
+
+                        let rect = canvas.get_bounding_client_rect();
+                        let x = f64::from(touch.client_x()) - rect.left();
+                        let y = f64::from(touch.client_y()) - rect.top();
+
+                        if is_point_in_rect((x,y), rect) {
+                            key_event_tx.set(Some(KeyEvent::MouseDown(x*dpr, y*dpr)));
+                        }
+                    }
+                }
+            }
+
+            on:touchend=move|ev| {
+                ev.prevent_default();
+
+                if let Some(canvas) = canvas_ref.get_untracked(){
+                    if let Some(touch) = ev.target_touches().item(0) {
+                        let dpr = window().device_pixel_ratio();
+
+                        let rect = canvas.get_bounding_client_rect();
+                        let x = f64::from(touch.client_x()) - rect.left();
+                        let y = f64::from(touch.client_y()) - rect.top();
+
+                        if is_point_in_rect((x,y), rect) {
+                            key_event_tx.set(Some(KeyEvent::MouseUp(x*dpr, y*dpr)));
+                            key_event_tx.set(Some(KeyEvent::MouseMove(x*dpr, y*dpr)));
+                        }
+                    }
+                }
+            }
+
+            on:touchmove=move|ev| {
+                ev.prevent_default();
+
+                if let Some(canvas) = canvas_ref.get_untracked(){
+                    if let Some(touch) = ev.target_touches().item(0) {
+                        let dpr = window().device_pixel_ratio();
+
+                        let rect = canvas.get_bounding_client_rect();
+                        let x = f64::from(touch.client_x()) - rect.left();
+                        let y = f64::from(touch.client_y()) - rect.top();
+
+                        if is_point_in_rect((x,y), rect) {
+                            key_event_tx.set(Some(KeyEvent::MouseMove(x*dpr, y*dpr)));
+                        }
+                    }
+                }
+            }
+
         ></canvas>
         {
             move || {
@@ -62,4 +118,11 @@ pub fn Player(
             }
         }
     }
+}
+
+pub fn is_point_in_rect(point: (f64, f64), rect: DomRect) -> bool {
+    point.0 > rect.left()
+        && point.0 < rect.right()
+        && point.1 > rect.top()
+        && point.1 < rect.bottom()
 }

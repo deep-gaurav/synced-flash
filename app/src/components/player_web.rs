@@ -332,7 +332,7 @@ impl Key {
             Key::UpArrow => KeyCode::UP,
             Key::DownArrow => KeyCode::DOWN,
             Key::LeftArrow => KeyCode::LEFT,
-            Key::RightArrow => KeyCode::DOWN,
+            Key::RightArrow => KeyCode::RIGHT,
         }
     }
 }
