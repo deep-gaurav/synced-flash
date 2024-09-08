@@ -76,6 +76,8 @@ dotenvy = "0.15.7"
 
 rust-call-client = { git = "https://github.com/deep-gaurav/rust_call_client" }
 
+openssl = { version = "0.10", features = ["vendored"] }
+
 [workspace.dependencies.ruffle_core]
 git = "https://github.com/deep-gaurav/ruffle.git"
 features = [
