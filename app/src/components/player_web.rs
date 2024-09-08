@@ -60,7 +60,7 @@ pub fn PlayerWeb(
             if let Some(event) = key_event_rx.get() {
                 if let Ok(player) = &mut player.lock() {
                     let ruffleevent = event.ruffle_event();
-                    info!("Sending event {ruffleevent:?}");
+                    // info!("Sending event {ruffleevent:?}");
                     // info!("Is mouse in stage {}", player.mouse_in_stage());
                     let is_handled = player.handle_event(ruffleevent);
                     // info!("Is handled {is_handled}")
