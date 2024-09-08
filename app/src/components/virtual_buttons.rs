@@ -16,6 +16,9 @@ pub enum Key {
     X,
     C,
     W,
+    A,
+    S,
+    D,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -38,6 +41,10 @@ impl Key {
             Key::C => "C".to_string(),
             Key::W => "W".to_string(),
             Key::X => "X".to_string(),
+
+            Key::A => "A".to_string(),
+            Key::D => "D".to_string(),
+            Key::S => "S".to_string(),
 
             Key::Space => "".to_string(),
         }
@@ -160,6 +167,47 @@ pub fn VirtualButtons(
                                     )
                                 }
                             > "Add Gamepad 2" </button>
+
+                            <button class="text-sm"
+                                type="button"
+                                on:click=move|_|{
+                                    set_virtual_keys.set(
+                                        vec![
+                                            VirtualKey{
+                                                key: Key::W,
+                                                left:42.5,
+                                                top:75.0,
+                                                width: 15.0,
+                                                height: 5.0,
+                                            },
+                                            VirtualKey{
+                                                key: Key::S,
+                                                left:42.5,
+                                                top:80.0,
+                                                width: 15.0,
+                                                height: 5.0
+                                            },
+
+                                            VirtualKey{
+                                                key: Key::A,
+                                                left:42.5 - 15.0,
+                                                top:80.0,
+                                                width: 15.0,
+                                                height: 5.0
+                                            },
+
+
+                                            VirtualKey{
+                                                key: Key::D,
+                                                left:42.5 + 15.0,
+                                                top:80.0,
+                                                width: 15.0,
+                                                height: 5.0
+                                            },
+                                        ]
+                                    )
+                                }
+                            > "Add Gamepad 3" </button>
 
                             <Portal
                                 class="absolute h-full w-full top-0 left-0 pointer-events-none z-30"

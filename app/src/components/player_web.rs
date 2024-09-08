@@ -345,6 +345,9 @@ impl Key {
             Key::X => KeyCode::X,
             Key::C => KeyCode::C,
             Key::W => KeyCode::W,
+            Key::A => KeyCode::A,
+            Key::S => KeyCode::S,
+            Key::D => KeyCode::D,
         }
     }
 }
