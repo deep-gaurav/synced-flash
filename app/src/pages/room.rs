@@ -48,14 +48,17 @@ pub fn RoomPage() -> impl IntoView {
                                     view! {
                                         <RoomInfo />
                                         <ChatBox />
-                                        <VirtualButtons event_sender=keyevent_tx />
+                                        <VirtualButtons event_rx=keyevent_rx event_sender=keyevent_tx />
 
                                         {
                                             move || {
                                                 if let Some(room_info) = room_info.get(){
                                                     if !room_info.is_host {
                                                         view! {
-                                                            <VideoPlayer/>
+                                                            <VideoPlayer
+                                                                events_rx=keyevent_rx
+                                                                events_tx=keyevent_tx
+                                                            />
                                                         }.into_view()
                                                     }else{
                                                         view! {}.into_view()

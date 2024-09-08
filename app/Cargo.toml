@@ -41,6 +41,9 @@ chrono = { workspace = true, features = ["wasmbind", "clock"] }
 url.workspace = true
 wasm-bindgen-futures.workspace = true
 
+serde.workspace = true
+bincode.workspace = true
+
 [features]
 default = []
 hydrate = [

@@ -1,17 +1,24 @@
+use ev::MessageEvent;
 use leptos::*;
 use leptos_use::use_event_listener;
 use logging::warn;
 use tracing::info;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{
-    js_sys::Array, MediaStream, RtcBundlePolicy, RtcConfiguration, RtcIceServer, RtcPeerConnection,
+    js_sys::Array, MediaStream, RtcBundlePolicy, RtcConfiguration, RtcDataChannelInit,
+    RtcIceConnectionState, RtcIceServer, RtcPeerConnection, RtcPeerConnectionState,
     RtcSessionDescriptionInit, RtcTrackEvent,
 };
 
 use crate::networking::room_manager::RoomManager;
 
+use super::virtual_buttons::KeyEvent;
+
 #[component]
-pub fn VideoPlayer() -> impl IntoView {
+pub fn VideoPlayer(
+    events_rx: ReadSignal<Option<KeyEvent>>,
+    events_tx: WriteSignal<Option<KeyEvent>>,
+) -> impl IntoView {
     let video_node = create_node_ref::<leptos::html::Video>();
 
     let (media_stream, set_media_stream) = create_signal(Option::<MediaStream>::None);
@@ -24,7 +31,9 @@ pub fn VideoPlayer() -> impl IntoView {
 
     create_effect(move |_| {
         let room_manager = expect_context::<RoomManager>();
-        leptos::spawn_local(async move { join_pc(room_manager, set_media_stream).await });
+        leptos::spawn_local(
+            async move { join_pc(room_manager, set_media_stream, events_rx).await },
+        );
     });
 
     view! {
@@ -42,7 +51,12 @@ pub fn VideoPlayer() -> impl IntoView {
     }
 }
 
-pub async fn join_pc(room_manager: RoomManager, media_setter: WriteSignal<Option<MediaStream>>) {
+pub async fn join_pc(
+    room_manager: RoomManager,
+    media_setter: WriteSignal<Option<MediaStream>>,
+    events_rx: ReadSignal<Option<KeyEvent>>,
+) {
+    let owner = Owner::current();
     let pc = RtcPeerConnection::new_with_configuration(&{
         let config = RtcConfiguration::new();
         config.set_bundle_policy(RtcBundlePolicy::MaxBundle);
@@ -59,6 +73,28 @@ pub async fn join_pc(room_manager: RoomManager, media_setter: WriteSignal<Option
         config
     });
     if let Ok(pc) = pc {
+        pc.create_data_channel("server-events");
+
+        let pc2 = pc.clone();
+        let rm2 = room_manager.clone();
+        leptos::spawn_local(async move {
+            let offer = wasm_bindgen_futures::JsFuture::from(pc2.create_offer()).await;
+
+            if let Ok(offer) = offer {
+                let local_offer: RtcSessionDescriptionInit = offer.unchecked_into();
+                if let Err(err) =
+                    wasm_bindgen_futures::JsFuture::from(pc2.set_local_description(&local_offer))
+                        .await
+                {
+                    warn!("Set local description failed {err:?}")
+                }
+                if let Some(sdp) = local_offer.get_sdp() {
+                    info!("Make session offer");
+                    rm2.send_rtc_message(common::message::RTCMessage::MakeJoinOffer(sdp));
+                }
+            }
+        });
+
         let _ = use_event_listener(
             pc.clone(),
             ev::Custom::<RtcTrackEvent>::new("track"),
@@ -73,13 +109,28 @@ pub async fn join_pc(room_manager: RoomManager, media_setter: WriteSignal<Option
             },
         );
 
-        room_manager.send_rtc_message(common::message::RTCMessage::RequestJoinSdp);
+        let pc_ev = pc.clone();
+        let rm2 = room_manager.clone();
+        let _ = use_event_listener(
+            pc.clone(),
+            ev::Custom::<ev::Event>::new("iceconnectionstatechange"),
+            move |_| {
+                info!("Connectionstate {:?}", pc_ev.ice_connection_state());
+                if pc_ev.ice_connection_state() == RtcIceConnectionState::Connected {
+                    info!("Connected, request dc");
+                    rm2.send_rtc_message(common::message::RTCMessage::RequestDataChannel(
+                        "events".to_string(),
+                    ));
+                }
+            },
+        );
         let rtc_signal = room_manager.get_rtc_signal();
         if let Some(rtc_signal) = rtc_signal {
             create_effect(move |_| {
                 if let Some(msg) = rtc_signal.get() {
                     match msg {
                         common::message::RTCMessage::JoinRemoteSdp(sdp) => {
+                            info!("Received join remote sdp");
                             let description =
                                 RtcSessionDescriptionInit::new(web_sys::RtcSdpType::Offer);
                             description.set_sdp(&sdp);
@@ -129,6 +180,63 @@ pub async fn join_pc(room_manager: RoomManager, media_setter: WriteSignal<Option
                         | common::message::RTCMessage::RequestJoinSdp
                         | common::message::RTCMessage::SendJoinLocalSdp(_) => {
                             warn!("Received non join rtc signal")
+                        }
+
+                        common::message::RTCMessage::RequestDataChannel(_) => {
+                            warn!("Not expected RequestDataChannel")
+                        }
+                        common::message::RTCMessage::DataChannelCreated((name, id)) => {
+                            info!("dc received");
+                            let dc = pc.clone().create_data_channel_with_data_channel_dict(
+                                &format!("{name}-sub"),
+                                &{
+                                    let init = RtcDataChannelInit::new();
+                                    init.set_negotiated(true);
+                                    init.set_id(id as u16);
+                                    init
+                                },
+                            );
+                            info!("DataChannel created");
+                            let dc2 = dc.clone();
+                            if let Some(owner) = owner {
+                                with_owner(owner, || {
+                                    create_effect(move |_| {
+                                        let event = events_rx.get();
+                                        if let Some(event) = event {
+                                            let data = bincode::serialize(&event);
+                                            if let Ok(data) = data {
+                                                if let Err(err) = dc2.send_with_u8_array(&data) {
+                                                    warn!("Failed to send to data_channel {err:?}")
+                                                }
+                                            }
+                                        }
+                                    });
+                                });
+                            }
+                            info!("Sending join sdp");
+                            room_manager
+                                .send_rtc_message(common::message::RTCMessage::RequestJoinSdp);
+                        }
+                        common::message::RTCMessage::MakeJoinOffer(_) => {
+                            warn!("Unexpected make offer");
+                        }
+                        common::message::RTCMessage::JoinAnswer(sdp) => {
+                            info!("Received join answer");
+                            let description =
+                                RtcSessionDescriptionInit::new(web_sys::RtcSdpType::Answer);
+                            description.set_sdp(&sdp);
+                            let pc2 = pc.clone();
+                            leptos::spawn_local(async move {
+                                let result = wasm_bindgen_futures::JsFuture::from(
+                                    pc2.set_remote_description(&description),
+                                )
+                                .await;
+                                match result {
+                                    Ok(_) => info!("remote desc set"),
+                                    Err(er) => info!("remote desc set failed {er:?}"),
+                                }
+                                // info!("Set result {")
+                            });
                         }
                     }
                 }

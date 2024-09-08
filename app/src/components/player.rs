@@ -1,15 +1,17 @@
 use std::future::IntoFuture;
 
+use ev::MessageEvent;
 use leptos::*;
 use leptos_use::{use_event_listener, use_event_listener_with_options, UseEventListenerOptions};
 use logging::warn;
 use tracing::info;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{
-    js_sys::{Array, Uint8Array},
+    js_sys::{Array, ArrayBuffer, Uint8Array},
     Blob, DomRect, HtmlCanvasElement, HtmlElement, HtmlInputElement, MediaStreamTrack,
-    RtcBundlePolicy, RtcConfiguration, RtcIceServer, RtcPeerConnection, RtcRtpTransceiverInit,
-    RtcSessionDescription, RtcSessionDescriptionInit,
+    RtcBundlePolicy, RtcConfiguration, RtcDataChannelInit, RtcIceConnectionState, RtcIceServer,
+    RtcPeerConnection, RtcPeerConnectionState, RtcRtpTransceiverInit, RtcSessionDescription,
+    RtcSessionDescriptionInit,
 };
 
 use crate::networking::room_manager::{self, RoomManager};
@@ -110,7 +112,7 @@ pub fn Player(
             let room_manager = expect_context::<RoomManager>();
             if room_manager.is_host() == Some(true) {
                 leptos::spawn_local(async move {
-                    setup_webrtc_sender(canvas, room_manager).await;
+                    setup_webrtc_sender(canvas, room_manager, key_event_tx).await;
                 });
             }
         }
@@ -175,7 +177,9 @@ pub fn is_point_in_rect(point: (f64, f64), rect: DomRect) -> bool {
 pub async fn setup_webrtc_sender(
     canvas: leptos::HtmlElement<leptos::html::Canvas>,
     room_manager: RoomManager,
+    events_tx: WriteSignal<Option<KeyEvent>>,
 ) {
+    let owner = Owner::current();
     let pc = RtcPeerConnection::new_with_configuration(&{
         let config = RtcConfiguration::new();
         config.set_bundle_policy(RtcBundlePolicy::MaxBundle);
@@ -190,7 +194,9 @@ pub async fn setup_webrtc_sender(
         });
         config
     });
+
     if let Ok(pc) = pc {
+        pc.create_data_channel("server-events");
         let media = canvas.capture_stream();
         match media {
             Ok(media) => {
@@ -244,11 +250,17 @@ pub async fn setup_webrtc_sender(
                             local_offer.get_sdp(),
                             send_tracks,
                         ));
+                        let pc_st = pc.clone();
+                        let rm2 = room_manager.clone();
                         let _ = use_event_listener(
                             pc.clone(),
                             ev::Custom::<ev::Event>::new("iceconnectionstatechange"),
                             move |_| {
-                                info!("ice change event called");
+                                info!("Connectionstate {:?}", pc_st.ice_connection_state());
+                                if pc_st.ice_connection_state() == RtcIceConnectionState::Connected
+                                {
+                                    info!("rtc connected");
+                                }
                             },
                         );
                         if let Some(rtc_signal) = room_manager.get_rtc_signal() {
@@ -278,6 +290,63 @@ pub async fn setup_webrtc_sender(
                                         | common::message::RTCMessage::JoinRemoteSdp(_)
                                         | common::message::RTCMessage::SendJoinLocalSdp(_) => {
                                             warn!("Non host rtc message received")
+                                        }
+                                        common::message::RTCMessage::RequestDataChannel(_) => {
+                                            warn!("Not expected RequestDataChannel")
+                                        }
+                                        common::message::RTCMessage::DataChannelCreated((
+                                            name,
+                                            id,
+                                        )) => {
+                                            info!("RequestDataChannel received {name} {id}");
+                                            let dc = pc
+                                                .clone()
+                                                .create_data_channel_with_data_channel_dict(
+                                                    &name,
+                                                    &{
+                                                        let init = RtcDataChannelInit::new();
+                                                        init.set_negotiated(true);
+                                                        init.set_id(id as u16);
+                                                        init
+                                                    },
+                                                );
+                                            if let Some(owner) = owner {
+                                                with_owner(owner, || {
+                                                    let _ = use_event_listener(
+                                                        dc.clone(),
+                                                        ev::Custom::<MessageEvent>::new("message"),
+                                                        move |ev| {
+                                                            let data =
+                                                                ev.data().dyn_into::<ArrayBuffer>();
+                                                            match data {
+                                                                Ok(data) => {
+                                                                    let uint8buf =
+                                                                        Uint8Array::new(&data);
+                                                                    let data_vec =
+                                                                        uint8buf.to_vec();
+                                                                    if let Ok(data) =
+                                                                        bincode::deserialize::<
+                                                                            KeyEvent,
+                                                                        >(
+                                                                            &data_vec
+                                                                        )
+                                                                    {
+                                                                        events_tx.set(Some(data));
+                                                                    }
+                                                                }
+                                                                Err(er) => {
+                                                                    warn!("ev data not arraybuffer {er:?}")
+                                                                }
+                                                            }
+                                                        },
+                                                    );
+                                                });
+                                                let dc2 = dc.clone();
+                                            }
+                                        }
+                                        common::message::RTCMessage::MakeJoinOffer(_)
+                                        | common::message::RTCMessage::JoinAnswer(_) => {
+                                            warn!("Unexpected player msg")
                                         }
                                     }
                                 }

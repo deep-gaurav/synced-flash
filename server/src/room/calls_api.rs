@@ -2,6 +2,7 @@ use rust_call_client::{
     apis::{
         add_a_track_api,
         configuration::{ApiKey, Configuration},
+        new_data_channel::{self, DataChannel, NewDataChannelReqBody},
         new_session_api, renegotiate_web_rtc_session_api,
     },
     models::{
@@ -9,7 +10,7 @@ use rust_call_client::{
         SessionDescription, TrackObject, TracksRequest,
     },
 };
-use tracing::warn;
+use tracing::{info, warn};
 
 #[derive(Clone)]
 pub struct CallsApi {
@@ -24,12 +25,28 @@ impl CallsApi {
         Self { app_id, config }
     }
 
-    pub async fn new_session(&self) -> Option<String> {
-        let resp = new_session_api::apps_app_id_sessions_new_post(&self.config, &self.app_id, None)
-            .await
-            .map_err(|e| warn!("New session failed {e:?}"))
-            .ok()?;
-        resp.session_id
+    pub async fn new_session(&self, sdp: Option<String>) -> Option<(String, Option<String>)> {
+        let resp = new_session_api::apps_app_id_sessions_new_post(
+            &self.config,
+            &self.app_id,
+            sdp.map(|sdp| AppsAppIdSessionsNewPostRequest {
+                session_description: Some(Box::new(SessionDescription {
+                    r#type: Some(rust_call_client::models::session_description::Type::Offer),
+                    sdp: Some(sdp),
+                })),
+            }),
+        )
+        .await
+        .map_err(|e| warn!("New session failed {e:?}"))
+        .ok()?;
+        if let Some(session_id) = resp.session_id {
+            Some((
+                session_id,
+                resp.session_description.map(|sdp| sdp.sdp).flatten(),
+            ))
+        } else {
+            None
+        }
     }
 
     pub async fn add_tracks(
@@ -91,5 +108,38 @@ impl CallsApi {
             )
             .await;
         resp.ok().map(|_| ())
+    }
+
+    pub async fn new_data_channel(
+        &self,
+        session_id: &str,
+        remote_session_id: Option<String>,
+        channel_name: String,
+    ) -> Option<u32> {
+        let dc = DataChannel {
+            location: if remote_session_id.is_some() {
+                rust_call_client::models::track_object::Location::Remote
+            } else {
+                rust_call_client::models::track_object::Location::Local
+            },
+            session_id: remote_session_id,
+            data_channel_name: channel_name,
+        };
+        info!("Creating data channel {dc:?} for session {session_id}");
+        let resp = new_data_channel::apps_app_id_sessions_session_id_datachannel_new_post(
+            &self.config,
+            &self.app_id,
+            session_id,
+            NewDataChannelReqBody {
+                data_channels: vec![dc],
+            },
+        )
+        .await;
+        let data = resp
+            .map(|p| p.data_channels.map(|p| p.first().map(|p| p.id)))
+            .ok()
+            .flatten()
+            .flatten();
+        data
     }
 }

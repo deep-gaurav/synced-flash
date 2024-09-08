@@ -14,9 +14,13 @@ pub enum Message {
 pub enum RTCMessage {
     AddHostSdp(Option<String>, Vec<(Option<String>, Option<String>)>),
     AddHostRemoteSdp(String),
+    MakeJoinOffer(String),
+    JoinAnswer(String),
     RequestJoinSdp,
     JoinRemoteSdp(String),
     SendJoinLocalSdp(String),
+    RequestDataChannel(String),
+    DataChannelCreated((String, u32)),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

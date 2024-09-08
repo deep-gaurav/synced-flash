@@ -115,6 +115,11 @@ features = [
     "RtcSdpType",
     "RtcRtpSender",
     "RtcTrackEvent",
+
+    "RtcDataChannel",
+    "RtcPeerConnectionState",
+    "RtcIceConnectionState",
+    "RtcDataChannelInit",
 ]
 
 # See https://github.com/akesson/cargo-leptos for documentation of all the parameters.

@@ -1,10 +1,11 @@
 use leptos::*;
+use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::components::portal::Portal;
 use crate::MountPoints;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Key {
     UpArrow,
     DownArrow,
@@ -12,7 +13,7 @@ pub enum Key {
     RightArrow,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum KeyEvent {
     Down(Key),
     Up(Key),
@@ -42,11 +43,17 @@ pub struct VirtualKey {
 }
 
 #[component]
-pub fn VirtualButtons(event_sender: WriteSignal<Option<KeyEvent>>) -> impl IntoView {
+pub fn VirtualButtons(
+    event_rx: ReadSignal<Option<KeyEvent>>,
+    event_sender: WriteSignal<Option<KeyEvent>>,
+) -> impl IntoView {
     let MountPoints { speaker_point, .. } = expect_context::<MountPoints>();
 
     let (virtual_keys, set_virtual_keys) = create_signal(Vec::new());
 
+    // create_effect(move |_| {
+    //     info!("event rx {:?}", event_rx.get());
+    // });
     view! {
         {
             move || {

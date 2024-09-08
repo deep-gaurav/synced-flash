@@ -157,6 +157,16 @@ mod ssr {
                     .await;
             }
         }
+        pub async fn send_msg_for_user(&self, room_id: &str, user_id: Uuid, message: Message) {
+            let rooms = self.rooms.read().await;
+            if let Some(room) = rooms.get(&UniCase::from(room_id)) {
+                if let Some(user) = room.users.iter().find(|u| u.meta.id == user_id) {
+                    if let Err(err) = user.sender.send(message).await {
+                        warn!("Failed to send msg to user {} {err:?}", user_id);
+                    }
+                }
+            }
+        }
 
         pub async fn remove_user(&self, room_id: &str, user_id: Uuid) -> Option<Vec<UserMeta>> {
             let mut rooms = self.rooms.write().await;
