@@ -11,6 +11,7 @@ pub enum Key {
     DownArrow,
     LeftArrow,
     RightArrow,
+    Space,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -29,6 +30,7 @@ impl Key {
             Key::DownArrow => "⬇️".to_string(),
             Key::LeftArrow => "⬅️".to_string(),
             Key::RightArrow => "➡️".to_string(),
+            Key::Space => "".to_string(),
         }
     }
 }
@@ -99,6 +101,14 @@ pub fn VirtualButtons(
                                                 left:42.5 + 15.0,
                                                 top:80.0,
                                                 width: 15.0,
+                                                height: 5.0
+                                            },
+
+                                            VirtualKey{
+                                                key: Key::Space,
+                                                left:42.5 - 15.0,
+                                                top:88.0,
+                                                width: 45.0,
                                                 height: 5.0
                                             }
                                         ]

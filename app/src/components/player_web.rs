@@ -56,14 +56,16 @@ pub fn PlayerWeb(
     });
 
     create_effect(move |_| {
-        if let Some(player) = player.get() {
-            if let Some(event) = key_event_rx.get() {
-                if let Ok(player) = &mut player.lock() {
-                    let ruffleevent = event.ruffle_event();
-                    // info!("Sending event {ruffleevent:?}");
-                    // info!("Is mouse in stage {}", player.mouse_in_stage());
-                    let is_handled = player.handle_event(ruffleevent);
-                    // info!("Is handled {is_handled}")
+        if let Some(canvas) = canvas_ref.get() {
+            if let Some(player) = player.get() {
+                if let Some(event) = key_event_rx.get() {
+                    if let Ok(player) = &mut player.lock() {
+                        let ruffleevent = event.ruffle_event(canvas);
+                        // info!("Sending event {ruffleevent:?}");
+                        // info!("Is mouse in stage {}", player.mouse_in_stage());
+                        let is_handled = player.handle_event(ruffleevent);
+                        // info!("Is handled {is_handled}")
+                    }
                 }
             }
         }
@@ -290,6 +292,12 @@ impl WebLogBackend {
     }
 }
 
+impl Default for WebLogBackend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LogBackend for WebLogBackend {
     fn avm_trace(&self, message: &str) {
         tracing::info!(target: "avm_trace", "{}", message);
@@ -309,9 +317,9 @@ pub fn load_swf(data: &[u8], name: &str, player: Arc<Mutex<Player>>) -> Result<(
     url.set_fragment(None);
     if let Ok(mut segments) = url.path_segments_mut() {
         segments.pop();
-        segments.push(&name);
+        segments.push(name);
     }
-    let mut movie = SwfMovie::from_data(data, url.to_string(), None)
+    let movie = SwfMovie::from_data(data, url.to_string(), None)
         .map_err(|e| format!("Error loading movie: {e}"))?;
     // movie.append_parameters(parse_movie_parameters(&parameters));
 
@@ -333,25 +341,18 @@ impl Key {
             Key::DownArrow => KeyCode::DOWN,
             Key::LeftArrow => KeyCode::LEFT,
             Key::RightArrow => KeyCode::RIGHT,
+            Key::Space => KeyCode::SPACE,
         }
     }
 }
 
 impl KeyEvent {
-    pub fn ruffle_event(&self) -> ruffle_core::events::PlayerEvent {
+    pub fn ruffle_event(
+        &self,
+        canvas: leptos::HtmlElement<leptos::html::Canvas>,
+    ) -> ruffle_core::events::PlayerEvent {
+        let rect = canvas.get_bounding_client_rect();
         match self {
-            // KeyEvent::Down(_) => ruffle_core::PlayerEvent::MouseDown {
-            //     x: 0.0,
-            //     y: 0.0,
-            //     button: ruffle_core::events::MouseButton::Left,
-            //     index: None,
-            // },
-            // KeyEvent::Up(_) => ruffle_core::PlayerEvent::MouseUp {
-            //     x: 0.0,
-            //     y: 0.0,
-            //     button: ruffle_core::events::MouseButton::Left,
-            //     // index: None,
-            // },
             KeyEvent::Down(key) => ruffle_core::PlayerEvent::KeyDown {
                 key_code: key.ruffle_key(),
                 key_char: None,
@@ -360,16 +361,19 @@ impl KeyEvent {
                 key_code: key.ruffle_key(),
                 key_char: None,
             },
-            KeyEvent::MouseMove(x, y) => ruffle_core::PlayerEvent::MouseMove { x: *x, y: *y },
+            KeyEvent::MouseMove(x, y) => ruffle_core::PlayerEvent::MouseMove {
+                x: (*x) * rect.width(),
+                y: (*y) * rect.height(),
+            },
             KeyEvent::MouseDown(x, y) => ruffle_core::PlayerEvent::MouseDown {
-                x: *x,
-                y: *y,
+                x: (*x) * rect.width(),
+                y: (*y) * rect.height(),
                 button: ruffle_core::events::MouseButton::Left,
                 index: None,
             },
             KeyEvent::MouseUp(x, y) => ruffle_core::PlayerEvent::MouseUp {
-                x: *x,
-                y: *y,
+                x: (*x) * rect.width(),
+                y: (*y) * rect.height(),
                 button: ruffle_core::events::MouseButton::Left,
             },
         }

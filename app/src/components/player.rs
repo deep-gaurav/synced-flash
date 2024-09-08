@@ -39,7 +39,7 @@ pub fn Player(
                 el_html.clone(),
                 leptos::ev::touchstart,
                 move |ev| {
-                    info!("Recceived start");
+                    // info!("Recceived start");
                     if let Some(canvas) = canvas_ref.get_untracked() {
                         if let Some(touch) = ev.changed_touches().item(0) {
                             let dpr = window().device_pixel_ratio();
@@ -50,7 +50,10 @@ pub fn Player(
                             if is_point_in_rect((x, y), rect.clone()) {
                                 let x = x - rect.left();
                                 let y = y - rect.top();
-                                key_event_tx.set(Some(KeyEvent::MouseDown(x * dpr, y * dpr)));
+                                key_event_tx.set(Some(KeyEvent::MouseDown(
+                                    x * dpr / rect.width(),
+                                    y * dpr / rect.height(),
+                                )));
 
                                 ev.prevent_default();
                             }
@@ -64,7 +67,7 @@ pub fn Player(
                 el_html.clone(),
                 leptos::ev::touchend,
                 move |ev| {
-                    info!("Recceived end");
+                    // info!("Recceived end");
                     if let Some(canvas) = canvas_ref.get_untracked() {
                         if let Some(touch) = ev.changed_touches().item(0) {
                             let dpr = window().device_pixel_ratio();
@@ -75,7 +78,10 @@ pub fn Player(
                             if is_point_in_rect((x, y), rect.clone()) {
                                 let x = x - rect.left();
                                 let y = y - rect.top();
-                                key_event_tx.set(Some(KeyEvent::MouseUp(x * dpr, y * dpr)));
+                                key_event_tx.set(Some(KeyEvent::MouseUp(
+                                    x * dpr / rect.width(),
+                                    y * dpr / rect.height(),
+                                )));
 
                                 ev.prevent_default();
                             }
@@ -99,7 +105,10 @@ pub fn Player(
                             if is_point_in_rect((x, y), rect.clone()) {
                                 let x = x - rect.left();
                                 let y = y - rect.top();
-                                key_event_tx.set(Some(KeyEvent::MouseMove(x * dpr, y * dpr)));
+                                key_event_tx.set(Some(KeyEvent::MouseMove(
+                                    x * dpr / rect.width(),
+                                    y * dpr / rect.height(),
+                                )));
 
                                 ev.prevent_default();
                             }
@@ -108,7 +117,11 @@ pub fn Player(
                 },
                 UseEventListenerOptions::default().passive(false),
             );
+        }
+    });
 
+    create_effect(move |_| {
+        if let Some(canvas) = canvas_ref.get() {
             let room_manager = expect_context::<RoomManager>();
             if room_manager.is_host() == Some(true) {
                 leptos::spawn_local(async move {
@@ -121,17 +134,25 @@ pub fn Player(
         <canvas ref=canvas_ref class="h-full w-full"
             class=("hidden", move || swf_data.with(|v| v.is_none()))
             on:mousemove=move|ev|{
-                let dpr = window().device_pixel_ratio();
-                key_event_tx.set(Some(KeyEvent::MouseMove(f64::from(ev.offset_x())*dpr, f64::from(ev.offset_y())*dpr)));
+                if let Some(canvas) = canvas_ref.get_untracked(){
+                    let rect = canvas.get_bounding_client_rect();
+                    let dpr = window().device_pixel_ratio();
+                    key_event_tx.set(Some(KeyEvent::MouseMove(f64::from(ev.offset_x())*dpr/rect.width(), f64::from(ev.offset_y())*dpr/rect.height())));
+                }
             }
             on:mousedown=move|ev|{
-                let dpr = window().device_pixel_ratio();
-                key_event_tx.set(Some(KeyEvent::MouseDown(f64::from(ev.offset_x())*dpr, f64::from(ev.offset_y())*dpr)));
+                if let Some(canvas) = canvas_ref.get_untracked(){
+                    let rect = canvas.get_bounding_client_rect();
+                    let dpr = window().device_pixel_ratio();
+                    key_event_tx.set(Some(KeyEvent::MouseDown(f64::from(ev.offset_x())*dpr/rect.width(), f64::from(ev.offset_y())*dpr/rect.height())));
+                }
             }
             on:mouseup=move|ev|{
-                let dpr = window().device_pixel_ratio();
-                key_event_tx.set(Some(KeyEvent::MouseUp(f64::from(ev.offset_x())*dpr, f64::from(ev.offset_y())*dpr)));
-                key_event_tx.set(Some(KeyEvent::MouseMove(f64::from(ev.offset_x())*dpr, f64::from(ev.offset_y())*dpr)));
+                if let Some(canvas) = canvas_ref.get_untracked(){
+                    let rect = canvas.get_bounding_client_rect();
+                    let dpr = window().device_pixel_ratio();
+                    key_event_tx.set(Some(KeyEvent::MouseUp(f64::from(ev.offset_x())*dpr/rect.width(), f64::from(ev.offset_y())*dpr/rect.height())));
+                }
             }
 
         ></canvas>
