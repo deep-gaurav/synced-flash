@@ -7,7 +7,8 @@ use web_sys::{js_sys::Uint8Array, Blob};
 
 use crate::{
     components::{
-        chatbox::ChatBox, player::Player, room_info::RoomInfo, virtual_buttons::VirtualButtons,
+        chatbox::ChatBox, player::Player, room_info::RoomInfo, video_player::VideoPlayer,
+        virtual_buttons::VirtualButtons,
     },
     networking::room_manager::RoomManager,
 };
@@ -32,6 +33,7 @@ pub fn RoomPage() -> impl IntoView {
     create_effect(move |_| set_is_csr.set(true));
 
     let (keyevent_rx, keyevent_tx) = create_signal(None);
+    let room_info = room_manager.get_room_info();
 
     view! {
         {move || {
@@ -47,60 +49,88 @@ pub fn RoomPage() -> impl IntoView {
                                         <RoomInfo />
                                         <ChatBox />
                                         <VirtualButtons event_sender=keyevent_tx />
+
+                                        {
+                                            move || {
+                                                if let Some(room_info) = room_info.get(){
+                                                    if !room_info.is_host {
+                                                        view! {
+                                                            <VideoPlayer/>
+                                                        }.into_view()
+                                                    }else{
+                                                        view! {}.into_view()
+                                                    }
+                                                }else{
+                                                    view! {}.into_view()
+                                                }
+                                            }
+                                        }
                                     }.into_view()
                                 }else {
                                     view! {}.into_view()
                                 }
                             }
                         }
-                        <div
-                            class="h-full w-full flex px-10 py-4 items-center justify-center flex-col"
-                            class=("hidden", move || swf_data.with(|v| v.is_some()))
-                        >
-                            <div class="h-4" />
-                            <h1 class="text-xl font-bold2">"Room " {room_id.to_uppercase()}</h1>
 
-                            <div class="h-full w-full my-8 p-4 flex flex-col items-center justify-center border-white border-dotted border-2 rounded-sm">
-                                <div class="h-4" />
-                                <label
-                                    for="video-picker"
-                                    class="flex flex-col items-center justify-center"
-                                >
-                                    <div>"Drag and Drop Video"</div>
-                                    <div>"Or"</div>
-                                    <div>"Click here to pick"</div>
-                                </label>
-                                <input
-                                    class="hidden"
-                                    type="file"
-                                    id="video-picker"
-                                    on:change=move |ev| {
-                                        let input_el = ev
-                                            .unchecked_ref::<web_sys::Event>()
-                                            .target()
-                                            .unwrap_throw()
-                                            .unchecked_into::<web_sys::HtmlInputElement>();
-                                        let files = input_el.files();
-                                        if let Some(file) = files.and_then(|f| f.item(0)) {
-                                            let name = file.name();
-                                            leptos::spawn_local(async move {
-                                                let blob: &Blob = file.as_ref();
-                                                let array_buf_fut = wasm_bindgen_futures::JsFuture::from(
-                                                        blob.array_buffer(),
-                                                    )
-                                                    .await;
-                                                if let Ok(array_buf_jsval) = array_buf_fut {
-                                                    let uint8array = Uint8Array::new(&array_buf_jsval).to_vec();
-                                                    set_swf_data.set(Some((name, uint8array)));
-                                                }
-                                            });
-                                        }
+                        {
+                            move || {
+                                let room_info = room_info.get().map(|r|r.is_host);
 
+                                if room_info != Some(false){
+                                    view! {
+                                        <div
+                                            class="h-full w-full flex px-10 py-4 items-center justify-center flex-col"
+                                            class=("hidden", move || swf_data.with(|v| v.is_some()))
+                                        >
+                                            <div class="h-4" />
+                                            <h1 class="text-xl font-bold2">"Room " {room_id.to_uppercase()}</h1>
 
-                                    }
-                                />
-                            </div>
-                        </div>
+                                            <div class="h-full w-full my-8 p-4 flex flex-col items-center justify-center border-white border-dotted border-2 rounded-sm">
+                                                <div class="h-4" />
+                                                <label
+                                                    for="video-picker"
+                                                    class="flex flex-col items-center justify-center"
+                                                >
+                                                    <div>"Drag and Drop Video"</div>
+                                                    <div>"Or"</div>
+                                                    <div>"Click here to pick"</div>
+                                                </label>
+                                                <input
+                                                    class="hidden"
+                                                    type="file"
+                                                    id="video-picker"
+                                                    on:change=move |ev| {
+                                                        let input_el = ev
+                                                            .unchecked_ref::<web_sys::Event>()
+                                                            .target()
+                                                            .unwrap_throw()
+                                                            .unchecked_into::<web_sys::HtmlInputElement>();
+                                                        let files = input_el.files();
+                                                        if let Some(file) = files.and_then(|f| f.item(0)) {
+                                                            let name = file.name();
+                                                            leptos::spawn_local(async move {
+                                                                let blob: &Blob = file.as_ref();
+                                                                let array_buf_fut = wasm_bindgen_futures::JsFuture::from(
+                                                                        blob.array_buffer(),
+                                                                    )
+                                                                    .await;
+                                                                if let Ok(array_buf_jsval) = array_buf_fut {
+                                                                    let uint8array = Uint8Array::new(&array_buf_jsval).to_vec();
+                                                                    set_swf_data.set(Some((name, uint8array)));
+                                                                }
+                                                            });
+                                                        }
+                                                    }
+                                                />
+                                            </div>
+                                        </div>
+                                    }.into_view()
+                                }else{
+                                    view! {}.into_view()
+                                }
+                            }
+                        }
+
                     }
                         .into_view()
                 } else {

@@ -1,9 +1,18 @@
+use std::future::IntoFuture;
+
 use leptos::*;
-use leptos_use::{use_event_listener_with_options, UseEventListenerOptions};
+use leptos_use::{use_event_listener, use_event_listener_with_options, UseEventListenerOptions};
+use logging::warn;
 use tracing::info;
+use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{
-    js_sys::Uint8Array, Blob, DomRect, HtmlCanvasElement, HtmlElement, HtmlInputElement,
+    js_sys::{Array, Uint8Array},
+    Blob, DomRect, HtmlCanvasElement, HtmlElement, HtmlInputElement, MediaStreamTrack,
+    RtcBundlePolicy, RtcConfiguration, RtcIceServer, RtcPeerConnection, RtcRtpTransceiverInit,
+    RtcSessionDescription, RtcSessionDescriptionInit,
 };
+
+use crate::networking::room_manager::{self, RoomManager};
 
 use super::virtual_buttons::KeyEvent;
 
@@ -97,6 +106,13 @@ pub fn Player(
                 },
                 UseEventListenerOptions::default().passive(false),
             );
+
+            let room_manager = expect_context::<RoomManager>();
+            if room_manager.is_host() == Some(true) {
+                leptos::spawn_local(async move {
+                    setup_webrtc_sender(canvas, room_manager).await;
+                });
+            }
         }
     });
     view! {
@@ -154,4 +170,128 @@ pub fn is_point_in_rect(point: (f64, f64), rect: DomRect) -> bool {
         && point.0 < rect.right()
         && point.1 > rect.top()
         && point.1 < rect.bottom()
+}
+
+pub async fn setup_webrtc_sender(
+    canvas: leptos::HtmlElement<leptos::html::Canvas>,
+    room_manager: RoomManager,
+) {
+    let pc = RtcPeerConnection::new_with_configuration(&{
+        let config = RtcConfiguration::new();
+        config.set_bundle_policy(RtcBundlePolicy::MaxBundle);
+        config.set_ice_servers(&{
+            let array = Array::new();
+            array.push(&JsValue::from({
+                let ice_server = RtcIceServer::new();
+                ice_server.set_urls(&JsValue::from_str("stun:stun.cloudflare.com:3478"));
+                ice_server
+            }));
+            JsValue::from(array)
+        });
+        config
+    });
+    if let Ok(pc) = pc {
+        let media = canvas.capture_stream();
+        match media {
+            Ok(media) => {
+                let mut tranceivers = vec![];
+                let tracks = media.get_tracks();
+                for track in tracks.iter() {
+                    match track.dyn_into::<MediaStreamTrack>() {
+                        Ok(track) => {
+                            tranceivers.push(pc.add_transceiver_with_media_stream_track_and_init(
+                                &track,
+                                &{
+                                    let init = RtcRtpTransceiverInit::new();
+                                    init.set_direction(
+                                        web_sys::RtcRtpTransceiverDirection::Sendonly,
+                                    );
+                                    init
+                                },
+                            ));
+                        }
+                        Err(err) => {
+                            warn!("track not MediaStreamTrack {err:?}")
+                        }
+                    }
+                }
+                let offer = wasm_bindgen_futures::JsFuture::from(pc.create_offer()).await;
+                match offer {
+                    Ok(offer) => {
+                        info!(
+                            "Info created, is init {}, is desc {}",
+                            offer.has_type::<RtcSessionDescriptionInit>(),
+                            offer.has_type::<RtcSessionDescription>()
+                        );
+                        let local_offer: RtcSessionDescriptionInit = offer.unchecked_into();
+                        if let Err(err) = wasm_bindgen_futures::JsFuture::from(
+                            pc.set_local_description(&local_offer),
+                        )
+                        .await
+                        {
+                            warn!("Set local description failed {err:?}")
+                        }
+                        let send_tracks = tranceivers
+                            .iter()
+                            .map(|t| (t.mid(), t.sender().track().map(|t| t.id())))
+                            .collect::<Vec<_>>();
+                        info!(
+                            "Ready to send sdp {:?} tracks: {:?}",
+                            local_offer.get_sdp(),
+                            send_tracks
+                        );
+                        room_manager.send_rtc_message(common::message::RTCMessage::AddHostSdp(
+                            local_offer.get_sdp(),
+                            send_tracks,
+                        ));
+                        let _ = use_event_listener(
+                            pc.clone(),
+                            ev::Custom::<ev::Event>::new("iceconnectionstatechange"),
+                            move |_| {
+                                info!("ice change event called");
+                            },
+                        );
+                        if let Some(rtc_signal) = room_manager.get_rtc_signal() {
+                            create_effect(move |_| {
+                                if let Some(msg) = rtc_signal.get() {
+                                    match msg {
+                                        common::message::RTCMessage::AddHostSdp(_, _) => {
+                                            warn!("Shouldnt receive AddHostSdp on client")
+                                        }
+                                        common::message::RTCMessage::AddHostRemoteSdp(sdp) => {
+                                            let description = RtcSessionDescriptionInit::new(
+                                                web_sys::RtcSdpType::Answer,
+                                            );
+                                            description.set_sdp(&sdp);
+                                            let pc2 = pc.clone();
+                                            leptos::spawn_local(async move {
+                                                let result = wasm_bindgen_futures::JsFuture::from(
+                                                    pc2.set_remote_description(&description),
+                                                )
+                                                .await;
+                                                if let Err(err) = result {
+                                                    warn!("Set Remote description failed {err:?}")
+                                                }
+                                            })
+                                        }
+                                        common::message::RTCMessage::RequestJoinSdp
+                                        | common::message::RTCMessage::JoinRemoteSdp(_)
+                                        | common::message::RTCMessage::SendJoinLocalSdp(_) => {
+                                            warn!("Non host rtc message received")
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    }
+                    Err(err) => {
+                        warn!("Offer creation failed {err:?}")
+                    }
+                }
+            }
+            Err(err) => {
+                warn!("Cannt capture canvas media {err:?}")
+            }
+        }
+    }
 }

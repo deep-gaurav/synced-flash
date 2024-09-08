@@ -49,6 +49,7 @@ pub struct UserMeta {
 pub struct Room {
     pub users: Vec<User>,
     pub player_status: PlayerStatus,
+    pub tracks: Option<(String, Vec<(Option<String>, Option<String>)>)>,
 }
 
 #[cfg(feature = "ssr")]
@@ -178,13 +179,33 @@ mod ssr {
                 .map(|room| room.player_status.clone())
         }
 
-        pub async fn with_room<U>(
+        pub async fn with_room_mut<U>(
             &self,
             room_id: &str,
             f: impl FnOnce(&mut Room) -> U,
         ) -> Option<U> {
             let mut rooms = self.rooms.write().await;
             rooms.get_mut(&UniCase::from(room_id)).map(f)
+        }
+
+        pub async fn with_room<U>(&self, room_id: &str, f: impl FnOnce(&Room) -> U) -> Option<U> {
+            let rooms = self.rooms.read().await;
+            rooms.get(&UniCase::from(room_id)).map(f)
+        }
+
+        pub async fn with_room_async<U, F, Fut>(&self, room_id: &str, f: F) -> Option<U>
+        where
+            F: FnOnce(&Room) -> Fut,
+            Fut: std::future::Future<Output = U>,
+        {
+            let rooms = self.rooms.read().await;
+            let room = rooms.get(&UniCase::from(room_id));
+            if let Some(room) = room {
+                let result = f(room).await;
+                Some(result)
+            } else {
+                None
+            }
         }
     }
 
@@ -193,6 +214,7 @@ mod ssr {
             Self {
                 users: vec![user],
                 player_status: PlayerStatus::Paused(0.0),
+                tracks: None,
             }
         }
     }

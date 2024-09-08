@@ -3,7 +3,7 @@ use std::{cell::RefCell, marker::PhantomData, rc::Rc};
 use codee::binary::BincodeSerdeCodec;
 use common::{
     endpoints,
-    message::{ClientMessage, Message, UserJoined, UserLeft},
+    message::{ClientMessage, Message, RTCMessage, UserJoined, UserLeft},
     params::{HostParams, JoinParams},
     PlayerStatus, UserMeta, UserState,
 };
@@ -96,6 +96,11 @@ where
         ReadSignal<Option<(UserMeta, String)>>,
         WriteSignal<Option<(UserMeta, String)>>,
     ),
+    pub rtc_message_signal: (
+        ReadSignal<Option<RTCMessage>>,
+        WriteSignal<Option<RTCMessage>>,
+    ),
+    pub is_host: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -103,6 +108,7 @@ pub struct RoomInfo {
     pub id: String,
     pub user_id: Uuid,
     pub users: Vec<UserMeta>,
+    pub is_host: bool,
     pub player_status: PlayerStatus,
 }
 
@@ -226,17 +232,23 @@ impl RoomManager {
                                             ready_state,
                                         )) = &*state_c_ref
                                         {
+                                            let is_host = room_info.users.first().map(|u| u.id)
+                                                == Some(room_info.user_id);
                                             let room_info = RoomInfo {
                                                 id: room_info.room_id.clone(),
                                                 user_id: room_info.user_id,
                                                 users: room_info.users,
                                                 player_status: room_info.player_status,
+                                                is_host,
                                             };
 
                                             let chat_signal =
                                                 with_owner(owner, || create_signal(None));
                                             let chat_history =
                                                 with_owner(owner, || store_value(Vec::new()));
+
+                                            let rtc_signal =
+                                                with_owner(owner, || create_signal(None));
 
                                             with_owner(owner, || {
                                                 create_effect(move |_| {
@@ -252,6 +264,8 @@ impl RoomManager {
                                                 ready_state: unsafe { std::ptr::read(ready_state) },
                                                 chat_signal,
                                                 chat_history,
+                                                rtc_message_signal: rtc_signal,
+                                                is_host,
                                             };
                                             drop(state_c_ref);
                                             let mut state = state_c.borrow_mut();
@@ -372,6 +386,15 @@ impl RoomManager {
                                         }
                                     }
                                 },
+                                Message::RTCMessage(rtc_messages) => {
+                                    if let RoomState::Connected(RoomConnectionInfo {
+                                        rtc_message_signal: (_, tx),
+                                        ..
+                                    }) = &*state_c.borrow()
+                                    {
+                                        tx.set(Some(rtc_messages))
+                                    }
+                                }
                             }
                         } else {
                             info!("Received nothing, closing");
@@ -509,6 +532,36 @@ impl RoomManager {
                 }
             }
             self.send_message(ClientMessage::Chat(msg), SendType::Reliable);
+        }
+    }
+
+    pub fn send_rtc_message(&self, message: RTCMessage) {
+        with_owner(self.owner, || {
+            if let RoomState::Connected(RoomConnectionInfo { connection, .. }) =
+                &*self.state.borrow()
+            {
+                connection.send(Message::RTCMessage(message));
+            }
+        })
+    }
+
+    pub fn get_rtc_signal(&self) -> Option<ReadSignal<Option<RTCMessage>>> {
+        if let RoomState::Connected(RoomConnectionInfo {
+            rtc_message_signal: (rx, _),
+            ..
+        }) = &*self.state.borrow()
+        {
+            Some(*rx)
+        } else {
+            None
+        }
+    }
+
+    pub fn is_host(&self) -> Option<bool> {
+        if let RoomState::Connected(RoomConnectionInfo { is_host, .. }) = &*self.state.borrow() {
+            Some(*is_host)
+        } else {
+            None
         }
     }
 }

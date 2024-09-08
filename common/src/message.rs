@@ -7,6 +7,16 @@ use crate::{PlayerStatus, UserMeta};
 pub enum Message {
     ServerMessage(ServerMessage),
     ClientMessage((Uuid, ClientMessage)),
+    RTCMessage(RTCMessage),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub enum RTCMessage {
+    AddHostSdp(Option<String>, Vec<(Option<String>, Option<String>)>),
+    AddHostRemoteSdp(String),
+    RequestJoinSdp,
+    JoinRemoteSdp(String),
+    SendJoinLocalSdp(String),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

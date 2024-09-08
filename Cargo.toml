@@ -72,6 +72,9 @@ chrono = { version = "0.4.38", default-features = false }
 url = "2.5.2"
 wasm-bindgen-futures = "0.4.43"
 base64 = "0.22.1"
+dotenvy = "0.15.7"
+
+rust-call-client = { path = "../rust_call_client" }
 
 [workspace.dependencies.ruffle_core]
 git = "https://github.com/deep-gaurav/ruffle.git"
@@ -94,6 +97,22 @@ features = [
     "ScreenOrientation",
     "OrientationLockType",
     "Storage",
+
+    "RtcPeerConnection",
+    "RtcSessionDescription",
+    "RtcConfiguration",
+    "RtcBundlePolicy",
+    "RtcIceServer",
+    "MediaStream",
+    "MediaStreamTrack",
+    "RtcRtpTransceiverInit",
+    "RtcRtpTransceiver",
+    "RtcRtpTransceiverDirection",
+    "RtcSessionDescriptionInit",
+    "RtcSessionDescription",
+    "RtcSdpType",
+    "RtcRtpSender",
+    "RtcTrackEvent",
 ]
 
 # See https://github.com/akesson/cargo-leptos for documentation of all the parameters.

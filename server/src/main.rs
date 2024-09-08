@@ -12,7 +12,7 @@ use leptos::*;
 use leptos_axum::{generate_route_list, handle_server_fns_with_context, LeptosRoutes};
 use leptos_router::RouteListing;
 use logging::warn;
-use room::{host_room, join_room};
+use room::{calls_api::CallsApi, host_room, join_room};
 use tower_http::compression::CompressionLayer;
 use tracing::{info, level_filters::LevelFilter};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
@@ -25,10 +25,12 @@ pub struct AppState {
     leptos_options: LeptosOptions,
     routes: Vec<RouteListing>,
     pub rooms: RoomProvider,
+    pub calls_api: CallsApi,
 }
 
 #[tokio::main]
 async fn main() {
+    let _ = dotenvy::dotenv();
     let subscriber = tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer())
         .with(
@@ -55,6 +57,11 @@ async fn main() {
         subscriber.init();
     }
 
+    let calls_api = CallsApi::new(
+        std::env::var("CALLS_APP_ID").expect("CALLS_APP_ID env missing"),
+        std::env::var("CALLS_API_TOKEN").expect("CALLS_API_TOKEN env missing"),
+    );
+
     // Setting get_configuration(None) means we'll be using cargo-leptos's env values
     // For deployment these variables are:
     // <https://github.com/leptos-rs/start-axum#executing-a-server-on-a-remote-machine-without-the-toolchain>
@@ -71,6 +78,7 @@ async fn main() {
         leptos_options,
         routes: routes.clone(),
         rooms: RoomProvider::new(),
+        calls_api,
     };
     // build our application with a route
     let app = Router::new()

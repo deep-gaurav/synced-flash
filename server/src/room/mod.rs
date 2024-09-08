@@ -16,6 +16,8 @@ use uuid::Uuid;
 
 use crate::AppState;
 
+pub mod calls_api;
+
 #[derive(Error, Debug)]
 pub enum RoomJoinError {
     #[error(transparent)]
@@ -104,6 +106,7 @@ async fn handle_websocket(
     mut socket: WebSocket,
     mut rx: tokio::sync::mpsc::Receiver<Message>,
 ) {
+    let mut session_id = None;
     loop {
         tokio::select! {
             msg = socket.recv() => {
@@ -111,73 +114,8 @@ async fn handle_websocket(
                     Some(msg) => {
                         match msg {
                             Ok(msg) => {
-                                match msg {
-                                    axum::extract::ws::Message::Text(_) => {
-                                        //ignore
-                                    },
-                                    axum::extract::ws::Message::Binary(data) => {
-                                        let data = bincode::deserialize::<Message>(&data[..]);
-                                        match data {
-                                            Ok(original_message) => {
-                                                match &original_message {
-                                                    Message::ServerMessage(_) => {
-                                                        //ignore
-                                                    },
-                                                    Message::ClientMessage((sender_id, message)) => {
-                                                        if sender_id == &user_id {
-                                                            match message {
-                                                                common::message::ClientMessage::Chat(_) => {
-                                                                    app_state.rooms.broadcast_msg_excluding(room_id, original_message, &[user_id]).await;
-                                                                }
-                                                                common::message::ClientMessage::SelectedVideo(video_name) => {
-                                                                    app_state.rooms.with_room(room_id, |room|{
-                                                                        if let Some(user) = room.users.iter_mut().find(|u|u.meta.id == user_id)
-                                                                        {
-                                                                            user.meta.state = UserState::VideoSelected(video_name.clone());
-                                                                        }
-                                                                    }).await;
-                                                                    app_state.rooms.broadcast_msg_excluding(room_id, original_message, &[user_id]).await;
-                                                                },
-                                                                common::message::ClientMessage::Play(val) => {
-                                                                    app_state.rooms.with_room(room_id, |room|{
-                                                                        room.player_status = PlayerStatus::Playing(*val);
-                                                                    }).await;
-                                                                    app_state.rooms.broadcast_msg_excluding(room_id, original_message, &[user_id]).await;
-                                                                },
-                                                                common::message::ClientMessage::Pause(val) => {
-                                                                    app_state.rooms.with_room(room_id, |room|{
-                                                                        room.player_status = PlayerStatus::Paused(*val);
-                                                                    }).await;
-                                                                    app_state.rooms.broadcast_msg_excluding(room_id, original_message, &[user_id]).await;
-                                                                },
-                                                                common::message::ClientMessage::Seek(val) | common::message::ClientMessage::Update(val) => {
-                                                                    app_state.rooms.with_room(room_id, |room|{
-                                                                        match &mut room.player_status {
-                                                                            PlayerStatus::Paused(time) | PlayerStatus::Playing(time) => *time = *val,
-                                                                        }
-                                                                    }).await;
-                                                                    app_state.rooms.broadcast_msg_excluding(room_id, original_message, &[user_id]).await;
-                                                                },
-                                                            }
-                                                        }
-                                                    },
-                                                }
-                                            },
-                                            Err(err) => {
-                                                warn!("Received msg decode error {err:#?}")
-                                            },
-                                        }
-                                    },
-                                    axum::extract::ws::Message::Ping(_) => {
-                                        //ignore
-                                    },
-                                    axum::extract::ws::Message::Pong(_) => {
-                                        //ignore
-                                    },
-                                    axum::extract::ws::Message::Close(_) => {
-                                        info!("Received Close from socket disconnecting {user_id}");
-                                        break;
-                                    },
+                                if handle_message(msg, user_id, room_id, &app_state, &mut session_id, &mut socket).await {
+                                    break;
                                 }
                             }
                             Err(err) => {
@@ -224,6 +162,233 @@ async fn handle_websocket(
                 .await;
         }
     }
+}
+
+pub async fn handle_message(
+    msg: axum::extract::ws::Message,
+    user_id: Uuid,
+    room_id: &str,
+    app_state: &AppState,
+    session_id: &mut Option<String>,
+    socker: &mut WebSocket,
+) -> bool {
+    match msg {
+        axum::extract::ws::Message::Text(_) => {
+            //ignore
+        }
+        axum::extract::ws::Message::Binary(data) => {
+            let data = bincode::deserialize::<Message>(&data[..]);
+            match data {
+                Ok(original_message) => {
+                    match &original_message {
+                        Message::ServerMessage(_) => {
+                            //ignore
+                        }
+                        Message::RTCMessage(message) => match message {
+                            common::message::RTCMessage::AddHostSdp(sdp, tracks) => {
+                                let new_session_id = app_state.calls_api.new_session().await;
+                                if let Some(new_session_id) = new_session_id {
+                                    let sdp = app_state
+                                        .calls_api
+                                        .add_tracks(
+                                            &new_session_id,
+                                            sdp.clone(),
+                                            tracks.clone(),
+                                            None,
+                                        )
+                                        .await;
+                                    if let Some(sdp) = sdp {
+                                        *session_id = Some(new_session_id.clone());
+                                        app_state
+                                            .rooms
+                                            .with_room_mut(room_id, |room| {
+                                                room.tracks = Some((new_session_id, tracks.clone()))
+                                            })
+                                            .await;
+                                        socker
+                                            .send_message(&Message::RTCMessage(
+                                                common::message::RTCMessage::AddHostRemoteSdp(sdp),
+                                            ))
+                                            .await;
+                                    } else {
+                                        warn!("Failed to add tracks")
+                                    }
+                                } else {
+                                    warn!("New session failed")
+                                }
+                                // socker.send_message(&Message::RTCMessage(
+                                //     common::message::RTCMessage::AddHostRemoteSdp((), ())
+                                // ))
+                            }
+                            common::message::RTCMessage::AddHostRemoteSdp(_) => todo!(),
+                            common::message::RTCMessage::RequestJoinSdp => {
+                                if session_id.is_some() {
+                                    warn!("Already joined");
+                                    return false;
+                                }
+                                if let Some((remote_session, tracks)) = app_state
+                                    .rooms
+                                    .with_room(room_id, |r| r.tracks.clone())
+                                    .await
+                                    .flatten()
+                                {
+                                    let new_session_id = app_state.calls_api.new_session().await;
+                                    if let Some(new_session_id) = new_session_id {
+                                        let sdp = app_state
+                                            .calls_api
+                                            .add_tracks(
+                                                &new_session_id,
+                                                None,
+                                                tracks.clone(),
+                                                Some(remote_session),
+                                            )
+                                            .await;
+                                        if let Some(sdp) = sdp {
+                                            *session_id = Some(new_session_id);
+                                            socker
+                                                .send_message(&Message::RTCMessage(
+                                                    common::message::RTCMessage::JoinRemoteSdp(sdp),
+                                                ))
+                                                .await;
+                                        } else {
+                                            warn!("Failed to add tracks")
+                                        }
+                                    } else {
+                                        warn!("New session failed")
+                                    }
+                                }
+                            }
+                            common::message::RTCMessage::JoinRemoteSdp(_) => {
+                                warn!("Not expected JoinRemoteSdp on server");
+                            }
+                            common::message::RTCMessage::SendJoinLocalSdp(sdp) => {
+                                if let Some(session_id) = &session_id {
+                                    match app_state
+                                        .calls_api
+                                        .renegotiate(session_id, sdp.clone())
+                                        .await
+                                    {
+                                        Some(_) => {
+                                            info!("Renegotiation success")
+                                        }
+                                        None => {
+                                            warn!("Renegotiation failed")
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        Message::ClientMessage((sender_id, message)) => {
+                            if sender_id == &user_id {
+                                match message {
+                                    common::message::ClientMessage::Chat(_) => {
+                                        app_state
+                                            .rooms
+                                            .broadcast_msg_excluding(
+                                                room_id,
+                                                original_message,
+                                                &[user_id],
+                                            )
+                                            .await;
+                                    }
+                                    common::message::ClientMessage::SelectedVideo(video_name) => {
+                                        app_state
+                                            .rooms
+                                            .with_room_mut(room_id, |room| {
+                                                if let Some(user) = room
+                                                    .users
+                                                    .iter_mut()
+                                                    .find(|u| u.meta.id == user_id)
+                                                {
+                                                    user.meta.state = UserState::VideoSelected(
+                                                        video_name.clone(),
+                                                    );
+                                                }
+                                            })
+                                            .await;
+                                        app_state
+                                            .rooms
+                                            .broadcast_msg_excluding(
+                                                room_id,
+                                                original_message,
+                                                &[user_id],
+                                            )
+                                            .await;
+                                    }
+                                    common::message::ClientMessage::Play(val) => {
+                                        app_state
+                                            .rooms
+                                            .with_room_mut(room_id, |room| {
+                                                room.player_status = PlayerStatus::Playing(*val);
+                                            })
+                                            .await;
+                                        app_state
+                                            .rooms
+                                            .broadcast_msg_excluding(
+                                                room_id,
+                                                original_message,
+                                                &[user_id],
+                                            )
+                                            .await;
+                                    }
+                                    common::message::ClientMessage::Pause(val) => {
+                                        app_state
+                                            .rooms
+                                            .with_room_mut(room_id, |room| {
+                                                room.player_status = PlayerStatus::Paused(*val);
+                                            })
+                                            .await;
+                                        app_state
+                                            .rooms
+                                            .broadcast_msg_excluding(
+                                                room_id,
+                                                original_message,
+                                                &[user_id],
+                                            )
+                                            .await;
+                                    }
+                                    common::message::ClientMessage::Seek(val)
+                                    | common::message::ClientMessage::Update(val) => {
+                                        app_state
+                                            .rooms
+                                            .with_room_mut(room_id, |room| {
+                                                match &mut room.player_status {
+                                                    PlayerStatus::Paused(time)
+                                                    | PlayerStatus::Playing(time) => *time = *val,
+                                                }
+                                            })
+                                            .await;
+                                        app_state
+                                            .rooms
+                                            .broadcast_msg_excluding(
+                                                room_id,
+                                                original_message,
+                                                &[user_id],
+                                            )
+                                            .await;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(err) => {
+                    warn!("Received msg decode error {err:#?}")
+                }
+            }
+        }
+        axum::extract::ws::Message::Ping(_) => {
+            //ignore
+        }
+        axum::extract::ws::Message::Pong(_) => {
+            //ignore
+        }
+        axum::extract::ws::Message::Close(_) => {
+            info!("Received Close from socket disconnecting {user_id}");
+            return true;
+        }
+    }
+    return false;
 }
 
 impl IntoResponse for RoomJoinError {

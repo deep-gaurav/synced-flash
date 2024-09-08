@@ -9,4 +9,5 @@ pub mod player;
 pub mod player_web;
 pub mod portal;
 pub mod room_info;
+pub mod video_player;
 pub mod virtual_buttons;
