@@ -29,5 +29,7 @@ dotenvy.workspace = true
 
 rust-call-client.workspace = true
 
+openssl.workspace = true
+
 [features]
 ssr = [] # No user, only here to satisfy rust analyzer
