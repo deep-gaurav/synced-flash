@@ -12,6 +12,10 @@ pub enum Key {
     LeftArrow,
     RightArrow,
     Space,
+
+    X,
+    C,
+    W,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -30,6 +34,11 @@ impl Key {
             Key::DownArrow => "⬇️".to_string(),
             Key::LeftArrow => "⬅️".to_string(),
             Key::RightArrow => "➡️".to_string(),
+
+            Key::C => "C".to_string(),
+            Key::W => "W".to_string(),
+            Key::X => "X".to_string(),
+
             Key::Space => "".to_string(),
         }
     }
@@ -115,6 +124,42 @@ pub fn VirtualButtons(
                                     )
                                 }
                             > "Add Gamepad" </button>
+
+                            <button class="text-sm"
+                                type="button"
+                                on:click=move|_|{
+                                    set_virtual_keys.set(
+                                        vec![
+                                            VirtualKey{
+                                                key: Key::X,
+                                                left:42.5 - 15.0,
+                                                top:80.0,
+                                                width: 15.0,
+                                                height: 5.0
+                                            },
+
+
+                                            VirtualKey{
+                                                key: Key::C,
+                                                left:42.5 + 15.0,
+                                                top:80.0,
+                                                width: 15.0,
+                                                height: 5.0
+                                            },
+
+
+                                            VirtualKey{
+                                                key: Key::W,
+                                                left:42.5 - 15.0,
+                                                top:88.0,
+                                                width: 45.0,
+                                                height: 5.0
+                                            }
+
+                                        ]
+                                    )
+                                }
+                            > "Add Gamepad 2" </button>
 
                             <Portal
                                 class="absolute h-full w-full top-0 left-0 pointer-events-none z-30"

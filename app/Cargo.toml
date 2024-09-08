@@ -51,7 +51,7 @@ hydrate = [
     "leptos_meta/hydrate",
     "leptos_router/hydrate",
     "canvas",
-    # "webgl",
+    "webgl",
     # "wgpu-webgl",
     # "webgpu",
     "ruffle_web_common",

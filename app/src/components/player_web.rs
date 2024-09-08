@@ -342,6 +342,9 @@ impl Key {
             Key::LeftArrow => KeyCode::LEFT,
             Key::RightArrow => KeyCode::RIGHT,
             Key::Space => KeyCode::SPACE,
+            Key::X => KeyCode::X,
+            Key::C => KeyCode::C,
+            Key::W => KeyCode::W,
         }
     }
 }
