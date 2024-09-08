@@ -4010,6 +4010,7 @@ source = "git+https://github.com/deep-gaurav/ruffle.git#92686b10b2b8e2d0600d6c56
 [[package]]
 name = "rust-call-client"
 version = "1.0.0"
+source = "git+https://github.com/deep-gaurav/rust_call_client#6b5678291d8b121d45f9c38e2e17cd9978402124"
 dependencies = [
  "reqwest",
  "serde",
