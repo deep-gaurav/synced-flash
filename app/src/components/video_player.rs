@@ -10,9 +10,10 @@ use web_sys::{
     RtcSessionDescriptionInit, RtcTrackEvent,
 };
 
-use crate::{components::player::is_point_in_rect, networking::room_manager::RoomManager};
-
-use super::virtual_buttons::KeyEvent;
+use crate::{
+    components::player::is_point_in_rect, networking::room_manager::RoomManager,
+    utils::keycode::KeyEvent,
+};
 
 #[component]
 pub fn VideoPlayer(

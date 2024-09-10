@@ -3,53 +3,8 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::components::portal::Portal;
+use crate::utils::keycode::{Key, KeyEvent};
 use crate::MountPoints;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum Key {
-    UpArrow,
-    DownArrow,
-    LeftArrow,
-    RightArrow,
-    Space,
-
-    X,
-    C,
-    W,
-    A,
-    S,
-    D,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum KeyEvent {
-    Down(Key),
-    Up(Key),
-    MouseMove(f64, f64),
-    MouseDown(f64, f64),
-    MouseUp(f64, f64),
-}
-
-impl Key {
-    pub fn get_symbol(&self) -> String {
-        match &self {
-            Key::UpArrow => "⬆️".to_string(),
-            Key::DownArrow => "⬇️".to_string(),
-            Key::LeftArrow => "⬅️".to_string(),
-            Key::RightArrow => "➡️".to_string(),
-
-            Key::C => "C".to_string(),
-            Key::W => "W".to_string(),
-            Key::X => "X".to_string(),
-
-            Key::A => "A".to_string(),
-            Key::D => "D".to_string(),
-            Key::S => "S".to_string(),
-
-            Key::Space => "".to_string(),
-        }
-    }
-}
 
 #[derive(Clone, PartialEq)]
 pub struct VirtualKey {

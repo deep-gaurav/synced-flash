@@ -14,9 +14,10 @@ use web_sys::{
     RtcSessionDescriptionInit,
 };
 
-use crate::networking::room_manager::{self, RoomManager};
-
-use super::virtual_buttons::KeyEvent;
+use crate::{
+    networking::room_manager::{self, RoomManager},
+    utils::keycode::{Key, KeyEvent},
+};
 
 #[component]
 pub fn Player(
@@ -132,6 +133,7 @@ pub fn Player(
     });
     view! {
         <canvas ref=canvas_ref class="h-full w-full"
+            tabindex="1"
             class=("hidden", move || swf_data.with(|v| v.is_none()))
             on:mousemove=move|ev|{
                 if let Some(canvas) = canvas_ref.get_untracked(){
@@ -152,6 +154,18 @@ pub fn Player(
                     let rect = canvas.get_bounding_client_rect();
                     let dpr = window().device_pixel_ratio();
                     key_event_tx.set(Some(KeyEvent::MouseUp(f64::from(ev.offset_x())*dpr/rect.width(), f64::from(ev.offset_y())*dpr/rect.height())));
+                }
+            }
+
+            on:keydown=move|ev|{
+                if let Ok(key) = Key::try_from(ev){
+                    key_event_tx.set(Some(KeyEvent::Down(key)));
+                }
+            }
+
+            on:keyup=move|ev|{
+                if let Ok(key) = Key::try_from(ev){
+                    key_event_tx.set(Some(KeyEvent::Up(key)));
                 }
             }
 

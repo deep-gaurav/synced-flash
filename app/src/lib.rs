@@ -13,6 +13,7 @@ pub mod components;
 pub mod error_template;
 pub mod networking;
 pub mod pages;
+pub mod utils;
 
 #[derive(Clone)]
 pub struct MountPoints {

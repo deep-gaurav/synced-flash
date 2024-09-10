@@ -26,7 +26,7 @@ use base64::Engine;
 use ruffle_core::backend::storage::StorageBackend;
 use web_sys::Storage;
 
-use super::virtual_buttons::{Key, KeyEvent};
+use crate::utils::keycode::{Key, KeyEvent};
 
 #[component]
 pub fn PlayerWeb(
@@ -329,7 +329,7 @@ pub fn load_swf(data: &[u8], name: &str, player: Arc<Mutex<Player>>) -> Result<(
         .lock()
         .map_err(|e| format!("cant lock player {e:?}"))?;
     player.update(|uc| {
-        uc.replace_root_movie(movie);
+        uc.set_root_movie(movie);
     });
     Ok(())
 }
@@ -342,12 +342,36 @@ impl Key {
             Key::LeftArrow => KeyCode::LEFT,
             Key::RightArrow => KeyCode::RIGHT,
             Key::Space => KeyCode::SPACE,
-            Key::X => KeyCode::X,
-            Key::C => KeyCode::C,
-            Key::W => KeyCode::W,
+
+            Key::CtrlLeft => KeyCode::CONTROL,
+            Key::CtrlRight => KeyCode::CONTROL,
+
             Key::A => KeyCode::A,
-            Key::S => KeyCode::S,
+            Key::B => KeyCode::B,
+            Key::C => KeyCode::C,
             Key::D => KeyCode::D,
+            Key::E => KeyCode::E,
+            Key::F => KeyCode::F,
+            Key::G => KeyCode::G,
+            Key::H => KeyCode::H,
+            Key::I => KeyCode::I,
+            Key::J => KeyCode::J,
+            Key::K => KeyCode::K,
+            Key::L => KeyCode::L,
+            Key::M => KeyCode::M,
+            Key::N => KeyCode::N,
+            Key::O => KeyCode::O,
+            Key::P => KeyCode::P,
+            Key::Q => KeyCode::Q,
+            Key::R => KeyCode::R,
+            Key::S => KeyCode::S,
+            Key::T => KeyCode::T,
+            Key::U => KeyCode::U,
+            Key::V => KeyCode::V,
+            Key::W => KeyCode::W,
+            Key::X => KeyCode::X,
+            Key::Y => KeyCode::Y,
+            Key::Z => KeyCode::Z,
         }
     }
 }
