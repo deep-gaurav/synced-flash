@@ -74,9 +74,10 @@ wasm-bindgen-futures = "0.4.43"
 base64 = "0.22.1"
 dotenvy = "0.15.7"
 
-rust-call-client = { git = "https://github.com/deep-gaurav/rust_call_client" }
-
 openssl = { version = "0.10", features = ["vendored"] }
+
+hmac = "0.12.1"
+sha1 = "0.10.6"
 
 [workspace.dependencies.ruffle_core]
 git = "https://github.com/deep-gaurav/ruffle.git"
@@ -120,6 +121,12 @@ features = [
     "RtcPeerConnectionState",
     "RtcIceConnectionState",
     "RtcDataChannelInit",
+
+    "RtcIceCandidate",
+    "RtcIceCandidateInit",
+    "RtcPeerConnectionIceEvent",
+    "RtcOfferOptions",
+    "RtcDataChannelEvent",
 ]
 
 # See https://github.com/akesson/cargo-leptos for documentation of all the parameters.

@@ -15,7 +15,10 @@ use web_sys::{
 };
 
 use crate::{
-    networking::room_manager::{self, RoomManager},
+    networking::{
+        room_manager::{self, RoomManager},
+        rtc_connect::receive_peer_connections,
+    },
     utils::keycode::{Key, KeyEvent},
 };
 
@@ -121,14 +124,30 @@ pub fn Player(
         }
     });
 
+    let owner = Owner::current();
     create_effect(move |_| {
-        if let Some(canvas) = canvas_ref.get() {
-            let room_manager = expect_context::<RoomManager>();
-            if room_manager.is_host() == Some(true) {
-                leptos::spawn_local(async move {
-                    setup_webrtc_sender(canvas, room_manager, key_event_tx).await;
+        let room_manager = expect_context::<RoomManager>();
+        let rtc_message_receiver = room_manager.get_rtc_signal();
+        let rtc_config = room_manager.get_rtc_config();
+        if let (Some(owner), Some(rtc_message_receiver), Some(rtc_config)) =
+            (owner, rtc_message_receiver, rtc_config)
+        {
+            with_owner(owner, || {
+                let (rtc_rx, rtc_tx) = create_signal(None);
+                create_effect(move |_| {
+                    if let Some(msg) = rtc_rx.get() {
+                        info!("Sending {msg:?}");
+                        room_manager.send_rtc_message(msg);
+                    }
                 });
-            }
+                receive_peer_connections(
+                    canvas_ref,
+                    rtc_config,
+                    rtc_message_receiver,
+                    rtc_tx,
+                    key_event_tx,
+                );
+            });
         }
     });
     view! {
@@ -207,195 +226,4 @@ pub fn is_point_in_rect(point: (f64, f64), rect: DomRect) -> bool {
         && point.0 < rect.right()
         && point.1 > rect.top()
         && point.1 < rect.bottom()
-}
-
-pub async fn setup_webrtc_sender(
-    canvas: leptos::HtmlElement<leptos::html::Canvas>,
-    room_manager: RoomManager,
-    events_tx: WriteSignal<Option<KeyEvent>>,
-) {
-    let owner = Owner::current();
-    let pc = RtcPeerConnection::new_with_configuration(&{
-        let config = RtcConfiguration::new();
-        config.set_bundle_policy(RtcBundlePolicy::MaxBundle);
-        config.set_ice_servers(&{
-            let array = Array::new();
-            array.push(&JsValue::from({
-                let ice_server = RtcIceServer::new();
-                ice_server.set_urls(&JsValue::from_str("stun:stun.cloudflare.com:3478"));
-                ice_server
-            }));
-            JsValue::from(array)
-        });
-        config
-    });
-
-    if let Ok(pc) = pc {
-        pc.create_data_channel("server-events");
-        let media = canvas.capture_stream();
-        match media {
-            Ok(media) => {
-                let mut tranceivers = vec![];
-                let tracks = media.get_tracks();
-                for track in tracks.iter() {
-                    match track.dyn_into::<MediaStreamTrack>() {
-                        Ok(track) => {
-                            tranceivers.push(pc.add_transceiver_with_media_stream_track_and_init(
-                                &track,
-                                &{
-                                    let init = RtcRtpTransceiverInit::new();
-                                    init.set_direction(
-                                        web_sys::RtcRtpTransceiverDirection::Sendonly,
-                                    );
-                                    init
-                                },
-                            ));
-                        }
-                        Err(err) => {
-                            warn!("track not MediaStreamTrack {err:?}")
-                        }
-                    }
-                }
-                let offer = wasm_bindgen_futures::JsFuture::from(pc.create_offer()).await;
-                match offer {
-                    Ok(offer) => {
-                        info!(
-                            "Info created, is init {}, is desc {}",
-                            offer.has_type::<RtcSessionDescriptionInit>(),
-                            offer.has_type::<RtcSessionDescription>()
-                        );
-                        let local_offer: RtcSessionDescriptionInit = offer.unchecked_into();
-                        if let Err(err) = wasm_bindgen_futures::JsFuture::from(
-                            pc.set_local_description(&local_offer),
-                        )
-                        .await
-                        {
-                            warn!("Set local description failed {err:?}")
-                        }
-                        let send_tracks = tranceivers
-                            .iter()
-                            .map(|t| (t.mid(), t.sender().track().map(|t| t.id())))
-                            .collect::<Vec<_>>();
-                        info!(
-                            "Ready to send sdp {:?} tracks: {:?}",
-                            local_offer.get_sdp(),
-                            send_tracks
-                        );
-                        room_manager.send_rtc_message(common::message::RTCMessage::AddHostSdp(
-                            local_offer.get_sdp(),
-                            send_tracks,
-                        ));
-                        let pc_st = pc.clone();
-                        let rm2 = room_manager.clone();
-                        let _ = use_event_listener(
-                            pc.clone(),
-                            ev::Custom::<ev::Event>::new("iceconnectionstatechange"),
-                            move |_| {
-                                info!("Connectionstate {:?}", pc_st.ice_connection_state());
-                                if pc_st.ice_connection_state() == RtcIceConnectionState::Connected
-                                {
-                                    info!("rtc connected");
-                                }
-                            },
-                        );
-                        if let Some(rtc_signal) = room_manager.get_rtc_signal() {
-                            create_effect(move |_| {
-                                if let Some(msg) = rtc_signal.get() {
-                                    match msg {
-                                        common::message::RTCMessage::AddHostSdp(_, _) => {
-                                            warn!("Shouldnt receive AddHostSdp on client")
-                                        }
-                                        common::message::RTCMessage::AddHostRemoteSdp(sdp) => {
-                                            let description = RtcSessionDescriptionInit::new(
-                                                web_sys::RtcSdpType::Answer,
-                                            );
-                                            description.set_sdp(&sdp);
-                                            let pc2 = pc.clone();
-                                            leptos::spawn_local(async move {
-                                                let result = wasm_bindgen_futures::JsFuture::from(
-                                                    pc2.set_remote_description(&description),
-                                                )
-                                                .await;
-                                                if let Err(err) = result {
-                                                    warn!("Set Remote description failed {err:?}")
-                                                }
-                                            })
-                                        }
-                                        common::message::RTCMessage::RequestJoinSdp
-                                        | common::message::RTCMessage::JoinRemoteSdp(_)
-                                        | common::message::RTCMessage::SendJoinLocalSdp(_) => {
-                                            warn!("Non host rtc message received")
-                                        }
-                                        common::message::RTCMessage::RequestDataChannel(_) => {
-                                            warn!("Not expected RequestDataChannel")
-                                        }
-                                        common::message::RTCMessage::DataChannelCreated((
-                                            name,
-                                            id,
-                                        )) => {
-                                            info!("RequestDataChannel received {name} {id}");
-                                            let dc = pc
-                                                .clone()
-                                                .create_data_channel_with_data_channel_dict(
-                                                    &name,
-                                                    &{
-                                                        let init = RtcDataChannelInit::new();
-                                                        init.set_negotiated(true);
-                                                        init.set_id(id as u16);
-                                                        init
-                                                    },
-                                                );
-                                            if let Some(owner) = owner {
-                                                with_owner(owner, || {
-                                                    let _ = use_event_listener(
-                                                        dc.clone(),
-                                                        ev::Custom::<MessageEvent>::new("message"),
-                                                        move |ev| {
-                                                            let data =
-                                                                ev.data().dyn_into::<ArrayBuffer>();
-                                                            match data {
-                                                                Ok(data) => {
-                                                                    let uint8buf =
-                                                                        Uint8Array::new(&data);
-                                                                    let data_vec =
-                                                                        uint8buf.to_vec();
-                                                                    if let Ok(data) =
-                                                                        bincode::deserialize::<
-                                                                            KeyEvent,
-                                                                        >(
-                                                                            &data_vec
-                                                                        )
-                                                                    {
-                                                                        events_tx.set(Some(data));
-                                                                    }
-                                                                }
-                                                                Err(er) => {
-                                                                    warn!("ev data not arraybuffer {er:?}")
-                                                                }
-                                                            }
-                                                        },
-                                                    );
-                                                });
-                                                let dc2 = dc.clone();
-                                            }
-                                        }
-                                        common::message::RTCMessage::MakeJoinOffer(_)
-                                        | common::message::RTCMessage::JoinAnswer(_) => {
-                                            warn!("Unexpected player msg")
-                                        }
-                                    }
-                                }
-                            });
-                        }
-                    }
-                    Err(err) => {
-                        warn!("Offer creation failed {err:?}")
-                    }
-                }
-            }
-            Err(err) => {
-                warn!("Cannt capture canvas media {err:?}")
-            }
-        }
-    }
 }

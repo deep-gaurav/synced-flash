@@ -3,7 +3,7 @@ use std::{cell::RefCell, marker::PhantomData, rc::Rc};
 use codee::binary::BincodeSerdeCodec;
 use common::{
     endpoints,
-    message::{ClientMessage, Message, RTCMessage, UserJoined, UserLeft},
+    message::{ClientMessage, Message, RTCMessage, RtcConfig, UserJoined, UserLeft},
     params::{HostParams, JoinParams},
     PlayerStatus, UserMeta, UserState,
 };
@@ -101,6 +101,7 @@ where
         WriteSignal<Option<RTCMessage>>,
     ),
     pub is_host: bool,
+    pub rtc_config: RtcConfig,
 }
 
 #[derive(Debug, Clone)]
@@ -234,6 +235,7 @@ impl RoomManager {
                                         {
                                             let is_host = room_info.users.first().map(|u| u.id)
                                                 == Some(room_info.user_id);
+                                            let rtc_config = room_info.rtc_config;
                                             let room_info = RoomInfo {
                                                 id: room_info.room_id.clone(),
                                                 user_id: room_info.user_id,
@@ -266,6 +268,7 @@ impl RoomManager {
                                                 chat_history,
                                                 rtc_message_signal: rtc_signal,
                                                 is_host,
+                                                rtc_config,
                                             };
                                             drop(state_c_ref);
                                             let mut state = state_c.borrow_mut();
@@ -552,6 +555,14 @@ impl RoomManager {
         }) = &*self.state.borrow()
         {
             Some(*rx)
+        } else {
+            None
+        }
+    }
+
+    pub fn get_rtc_config(&self) -> Option<RtcConfig> {
+        if let RoomState::Connected(RoomConnectionInfo { rtc_config, .. }) = &*self.state.borrow() {
+            Some(rtc_config.clone())
         } else {
             None
         }

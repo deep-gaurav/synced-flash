@@ -41,7 +41,6 @@ pub fn RoomPage() -> impl IntoView {
                 if !room_id.is_empty() {
                     view! {
                         <Title text=format!("Room {room_id}") />
-                        <Player  swf_data=swf_data key_event_rx=keyevent_rx key_event_tx=keyevent_tx/>
                         {
                             move || {
                                 if is_csr.get(){
@@ -61,7 +60,9 @@ pub fn RoomPage() -> impl IntoView {
                                                             />
                                                         }.into_view()
                                                     }else{
-                                                        view! {}.into_view()
+                                                        view! {
+                                                            <Player  swf_data=swf_data key_event_rx=keyevent_rx key_event_tx=keyevent_tx/>
+                                                        }.into_view()
                                                     }
                                                 }else{
                                                     view! {}.into_view()

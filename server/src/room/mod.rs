@@ -16,8 +16,6 @@ use uuid::Uuid;
 
 use crate::AppState;
 
-pub mod calls_api;
-
 #[derive(Error, Debug)]
 pub enum RoomJoinError {
     #[error(transparent)]
@@ -185,178 +183,38 @@ pub async fn handle_message(
                             //ignore
                         }
                         Message::RTCMessage(message) => match message {
-                            common::message::RTCMessage::AddHostSdp(sdp, tracks) => {
-                                let new_session_id = app_state.calls_api.new_session(None).await;
-                                if let Some((new_session_id, answer)) = new_session_id {
-                                    let sdp = app_state
-                                        .calls_api
-                                        .add_tracks(
-                                            &new_session_id,
-                                            sdp.clone(),
-                                            tracks.clone(),
-                                            None,
-                                        )
-                                        .await;
-                                    if let Some(sdp) = sdp {
-                                        *session_id = Some(new_session_id.clone());
-                                        app_state
-                                            .rooms
-                                            .with_room_mut(room_id, |room| {
-                                                room.tracks = Some((new_session_id, tracks.clone()))
-                                            })
-                                            .await;
-                                        socker
-                                            .send_message(&Message::RTCMessage(
-                                                common::message::RTCMessage::AddHostRemoteSdp(sdp),
-                                            ))
-                                            .await;
-                                    } else {
-                                        warn!("Failed to add tracks")
-                                    }
-                                } else {
-                                    warn!("New session failed")
-                                }
-                                // socker.send_message(&Message::RTCMessage(
-                                //     common::message::RTCMessage::AddHostRemoteSdp((), ())
-                                // ))
-                            }
-                            common::message::RTCMessage::AddHostRemoteSdp(_) => todo!(),
-
-                            common::message::RTCMessage::MakeJoinOffer(sdp) => {
-                                if session_id.is_some() {
-                                    warn!("Already joined");
-                                    return false;
-                                }
-                                info!("making join offer");
-                                if let Some((new_session_id, answer)) =
-                                    app_state.calls_api.new_session(Some(sdp.clone())).await
-                                {
-                                    *session_id = Some(new_session_id);
-                                    if let Some(answer) = answer {
-                                        socker
-                                            .send_message(&Message::RTCMessage(
-                                                common::message::RTCMessage::JoinAnswer(answer),
-                                            ))
-                                            .await;
-                                    }
-                                }
-                            }
-                            common::message::RTCMessage::JoinAnswer(_) => todo!(),
-                            common::message::RTCMessage::RequestJoinSdp => {
-                                if let Some((remote_session, tracks)) = app_state
+                            common::message::RTCMessage::ExchangeSessionDesc(
+                                uuid,
+                                rtcsession_desc,
+                            ) => {
+                                app_state
                                     .rooms
-                                    .with_room(room_id, |r| r.tracks.clone())
-                                    .await
-                                    .flatten()
-                                {
-                                    let new_session_id = session_id.clone().or(app_state
-                                        .calls_api
-                                        .new_session(None)
-                                        .await
-                                        .map(|p| p.0));
-                                    if let Some(new_session_id) = new_session_id {
-                                        let sdp = app_state
-                                            .calls_api
-                                            .add_tracks(
-                                                &new_session_id,
-                                                None,
-                                                tracks.clone(),
-                                                Some(remote_session),
-                                            )
-                                            .await;
-                                        if let Some(sdp) = sdp {
-                                            *session_id = Some(new_session_id);
-                                            socker
-                                                .send_message(&Message::RTCMessage(
-                                                    common::message::RTCMessage::JoinRemoteSdp(sdp),
-                                                ))
-                                                .await;
-                                        } else {
-                                            warn!("Failed to add tracks")
-                                        }
-                                    } else {
-                                        warn!("New session failed")
-                                    }
-                                }
+                                    .send_msg_for_user(
+                                        room_id,
+                                        *uuid,
+                                        Message::RTCMessage(
+                                            common::message::RTCMessage::ExchangeSessionDesc(
+                                                user_id,
+                                                rtcsession_desc.clone(),
+                                            ),
+                                        ),
+                                    )
+                                    .await;
                             }
-                            common::message::RTCMessage::JoinRemoteSdp(_) => {
-                                warn!("Not expected JoinRemoteSdp on server");
-                            }
-
-                            common::message::RTCMessage::DataChannelCreated(_) => {
-                                warn!("Not expected DataChannelCreated on server");
-                            }
-                            common::message::RTCMessage::SendJoinLocalSdp(sdp) => {
-                                if let Some(session_id) = &session_id {
-                                    match app_state
-                                        .calls_api
-                                        .renegotiate(session_id, sdp.clone())
-                                        .await
-                                    {
-                                        Some(_) => {
-                                            info!("Renegotiation success")
-                                        }
-                                        None => {
-                                            warn!("Renegotiation failed")
-                                        }
-                                    }
-                                }
-                            }
-                            common::message::RTCMessage::RequestDataChannel(name) => {
-                                if let Some(session_id) = &session_id {
-                                    if let Some(host_session_id) = app_state
-                                        .rooms
-                                        .with_room(room_id, |r| {
-                                            r.tracks.as_ref().map(|r| r.0.clone())
-                                        })
-                                        .await
-                                        .flatten()
-                                    {
-                                        if session_id == &host_session_id {
-                                            warn!("Host cant request data channel");
-                                            return false;
-                                        }
-                                        let data_channel_sender = app_state
-                                            .calls_api
-                                            .new_data_channel(session_id, None, name.clone())
-                                            .await;
-                                        let data_channel_host_sub = app_state
-                                            .calls_api
-                                            .new_data_channel(
-                                                &host_session_id,
-                                                Some(session_id.clone()),
-                                                name.clone(),
-                                            )
-                                            .await;
-                                        if let (Some(data_channel), Some(data_channel_sub)) =
-                                            (data_channel_sender, data_channel_host_sub)
-                                        {
-                                            socker
-                                                .send_message(&Message::RTCMessage(
-                                                    common::message::RTCMessage::DataChannelCreated(
-                                                        (name.clone(), data_channel),
-                                                    ),
-                                                ))
-                                                .await;
-                                            if let Some(host_user_id) = app_state
-                                                .rooms
-                                                .with_room(room_id, |room| {
-                                                    room.users.first().map(|u| u.meta.id)
-                                                })
-                                                .await
-                                                .flatten()
-                                            {
-                                                app_state.rooms.send_msg_for_user(room_id, host_user_id, Message::RTCMessage(
-                                                    common::message::RTCMessage::DataChannelCreated(
-                                                        (format!("{user_id}-sub"), data_channel_sub),
-                                                    ),
-                                                )).await;
-                                            }
-                                        } else {
-                                            warn!("Data channel creation failed")
-                                        }
-                                    }
-                                }
+                            common::message::RTCMessage::ExchangeCandidate(uuid, candidate) => {
+                                app_state
+                                    .rooms
+                                    .send_msg_for_user(
+                                        room_id,
+                                        *uuid,
+                                        Message::RTCMessage(
+                                            common::message::RTCMessage::ExchangeCandidate(
+                                                user_id,
+                                                candidate.clone(),
+                                            ),
+                                        ),
+                                    )
+                                    .await;
                             }
                         },
                         Message::ClientMessage((sender_id, message)) => {
@@ -476,7 +334,10 @@ impl IntoResponse for RoomJoinError {
     fn into_response(self) -> Response {
         match self {
             RoomJoinError::RoomProviderError(err) => match err {
-                RoomProviderError::KeyGenerationFailed => {
+                RoomProviderError::KeyGenerationFailed
+                | RoomProviderError::RTCConfigGenerationFailed(_)
+                | RoomProviderError::TimeError(_)
+                | RoomProviderError::HmacError(_) => {
                     (StatusCode::INTERNAL_SERVER_ERROR, format!("{err:#?}")).into_response()
                 }
                 RoomProviderError::RoomDoesntExist => {
