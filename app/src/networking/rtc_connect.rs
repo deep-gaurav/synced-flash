@@ -11,8 +11,8 @@ use uuid::Uuid;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{
     js_sys::{Array, ArrayBuffer, Uint8Array, JSON},
-    Blob, MediaStream, MessageEvent, RtcConfiguration, RtcDataChannelEvent, RtcIceCandidate,
-    RtcIceCandidateInit, RtcIceServer, RtcOfferOptions, RtcPeerConnection,
+    Blob, MediaStream, MessageEvent, RtcConfiguration, RtcDataChannelEvent, RtcDataChannelInit,
+    RtcIceCandidate, RtcIceCandidateInit, RtcIceServer, RtcOfferOptions, RtcPeerConnection,
     RtcPeerConnectionIceEvent, RtcSdpType, RtcSessionDescriptionInit, RtcTrackEvent,
 };
 
@@ -69,7 +69,12 @@ pub async fn connect_to_host(
         );
     });
 
-    let dc = pc.create_data_channel("events");
+    let dc = pc.create_data_channel_with_data_channel_dict("events", &{
+        let dict = RtcDataChannelInit::new();
+        dict.set_ordered(false);
+        dict.set_max_retransmits(0);
+        dict
+    });
 
     with_owner(owner, || {
         create_effect(move |_| {
@@ -320,7 +325,7 @@ async fn accept_peer_connection(
     let canvas = canvas
         .get_untracked()
         .ok_or(JsValue::from_str("canvas not connected"))?;
-    let media_stream = canvas.capture_stream()?;
+    let media_stream = canvas.capture_stream_with_frame_request_rate(30.0)?;
     for track in media_stream.get_video_tracks() {
         pc.add_track(&track.dyn_into()?, &media_stream, &Array::new());
     }
