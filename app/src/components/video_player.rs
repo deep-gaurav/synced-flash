@@ -6,7 +6,7 @@ use web_sys::MediaStream;
 use crate::{
     components::player::is_point_in_rect,
     networking::{room_manager::RoomManager, rtc_connect::connect_to_host},
-    utils::keycode::KeyEvent,
+    utils::keycode::{Key, KeyEvent},
 };
 
 #[component]
@@ -169,6 +169,8 @@ pub fn VideoPlayer(
                     muted
                     playsinline
 
+                    tabindex="1"
+
                     on:mousemove=move|ev|{
                         if let Some(canvas) = video_node.get_untracked(){
                             let rect = canvas.get_bounding_client_rect();
@@ -188,6 +190,18 @@ pub fn VideoPlayer(
                             let rect = canvas.get_bounding_client_rect();
                             let dpr = window().device_pixel_ratio();
                             events_tx.set(Some(KeyEvent::MouseUp(f64::from(ev.offset_x())*dpr/rect.width(), f64::from(ev.offset_y())*dpr/rect.height())));
+                        }
+                    }
+
+                    on:keydown=move|ev|{
+                        if let Ok(key) = Key::try_from(ev){
+                            events_tx.set(Some(KeyEvent::Down(key)));
+                        }
+                    }
+
+                    on:keyup=move|ev|{
+                        if let Ok(key) = Key::try_from(ev){
+                            events_tx.set(Some(KeyEvent::Up(key)));
                         }
                     }
                 />
