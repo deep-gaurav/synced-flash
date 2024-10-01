@@ -78,7 +78,7 @@ pub fn PlayerWeb(
         if let Some(canvas) = canvas_ref.get() {
             let canvas_ref: &web_sys::HtmlCanvasElement = canvas.as_ref();
             let canvas_element: web_sys::HtmlCanvasElement = canvas_ref.clone();
-            let quality = ruffle_render::quality::StageQuality::High;
+            let quality = ruffle_render::quality::StageQuality::Medium;
             leptos::spawn_local(async move {
                 let rendere_backend = create_renderer(canvas_element, quality).await;
                 if let Ok(renderer) = rendere_backend {
@@ -88,7 +88,7 @@ pub fn PlayerWeb(
                         .with_boxed_renderer(renderer)
                         .with_log(WebLogBackend::new())
                         // .with_ui(ui::WebUiBackend::new(js_player.clone(), &canvas))
-                        .with_letterbox(ruffle_core::config::Letterbox::Fullscreen)
+                        .with_letterbox(ruffle_core::config::Letterbox::On)
                         .with_max_execution_duration(Duration::from_secs_f64(15.0))
                         .with_player_version(None)
                         .with_player_runtime(PlayerRuntime::FlashPlayer)
@@ -96,9 +96,9 @@ pub fn PlayerWeb(
                         .with_quality(quality)
                         .with_align(StageAlign::empty(), false)
                         .with_scale_mode(StageScaleMode::ShowAll, false)
-                        .with_frame_rate(None)
+                        .with_frame_rate(Some(30.0))
                         // // FIXME - should this be configurable?
-                        .with_sandbox_type(SandboxType::Remote)
+                        .with_sandbox_type(SandboxType::LocalWithFile)
                         .with_page_url(window().location().href().ok());
                     #[cfg(feature = "ruffle_video_software")]
                     {
