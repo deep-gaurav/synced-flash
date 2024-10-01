@@ -325,7 +325,7 @@ async fn accept_peer_connection(
     let canvas = canvas
         .get_untracked()
         .ok_or(JsValue::from_str("canvas not connected"))?;
-    let media_stream = canvas.capture_stream_with_frame_request_rate(30.0)?;
+    let media_stream = canvas.capture_stream()?;
     for track in media_stream.get_video_tracks() {
         pc.add_track(&track.dyn_into()?, &media_stream, &Array::new());
     }
