@@ -84,7 +84,7 @@ impl TryFrom<web_sys::KeyboardEvent> for Key {
             "ControlLeft" => Ok(Key::CtrlLeft),
             "ControlRight" => Ok(Key::CtrlRight),
 
-            "SPace" => Ok(Key::Space),
+            "Space" => Ok(Key::Space),
 
             "ArrowUp" => Ok(Key::UpArrow),
             "ArrowDown" => Ok(Key::DownArrow),

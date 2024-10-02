@@ -1,7 +1,6 @@
 use leptos::*;
 use leptos_meta::Title;
 use leptos_router::*;
-use tracing::info;
 use wasm_bindgen::{JsCast, UnwrapThrowExt};
 use web_sys::{js_sys::Uint8Array, Blob};
 

@@ -17,6 +17,7 @@ pub mod utils;
 
 #[derive(Clone)]
 pub struct MountPoints {
+    pub main_screen: NodeRef<leptos::html::Div>,
     pub handle_point: NodeRef<leptos::html::Div>,
     pub side_point: NodeRef<leptos::html::Div>,
     pub speaker_point: NodeRef<leptos::html::Div>,
@@ -35,10 +36,13 @@ pub fn App() -> impl IntoView {
     let side_point = create_node_ref();
     let speaker_point = create_node_ref();
 
+    let main_screen = create_node_ref();
+
     let mount_points = MountPoints {
         handle_point,
         side_point,
         speaker_point,
+        main_screen,
     };
 
     provide_context(mount_points);
@@ -77,10 +81,12 @@ pub fn App() -> impl IntoView {
                 >
                     <div class="h-full w-full absolute bg-cover bg-center bg-no-repeat bg-[url('/assets/images/synced_crt.png')] z-10 pointer-events-none" />
                     <div class="absolute left-[7%] w-[68%] top-[11%] h-[79%] bg-slate-800">
-                        <Routes>
-                            <Route path="" view=HomePage />
-                            <Route path="room/:id" view=RoomPage />
-                        </Routes>
+                        <div class="w-full h-full">
+                            <Routes>
+                                <Route path="" view=HomePage />
+                                <Route path="room/:id" view=RoomPage />
+                            </Routes>
+                        </div>
                     </div>
                     <div
                         class="absolute left-[81.5%] w-[16%] top-[6%] h-[30%] z-20"

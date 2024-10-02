@@ -179,12 +179,16 @@ pub fn Player(
             on:keydown=move|ev|{
                 if let Ok(key) = Key::try_from(ev){
                     key_event_tx.set(Some(KeyEvent::Down(key)));
+                }else {
+                    warn!("Cant convert event to KeyEvent")
                 }
             }
 
             on:keyup=move|ev|{
                 if let Ok(key) = Key::try_from(ev){
                     key_event_tx.set(Some(KeyEvent::Up(key)));
+                }else{
+                    warn!("Cant convert event to KeyEvent")
                 }
             }
 

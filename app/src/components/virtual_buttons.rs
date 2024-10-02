@@ -1,4 +1,5 @@
 use leptos::*;
+use logging::warn;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
@@ -20,7 +21,11 @@ pub fn VirtualButtons(
     event_rx: ReadSignal<Option<KeyEvent>>,
     event_sender: WriteSignal<Option<KeyEvent>>,
 ) -> impl IntoView {
-    let MountPoints { speaker_point, .. } = expect_context::<MountPoints>();
+    let MountPoints {
+        speaker_point,
+        main_screen,
+        ..
+    } = expect_context::<MountPoints>();
 
     let (virtual_keys, set_virtual_keys) = create_signal(Vec::new());
 
@@ -164,6 +169,18 @@ pub fn VirtualButtons(
                                 }
                             > "Add Gamepad 3" </button>
 
+                            <button class="text-sm"
+                                type="button"
+                                on:click=move|_|{
+                                    if let Some(div)= main_screen.get_untracked(){
+                                        if let Err(err) =  div.request_fullscreen() {
+                                            warn!("Cannot fullscreen");
+                                        }
+                                    }
+                                }
+                            >
+                                "Full Screen"
+                            </button>
                             <Portal
                                 class="absolute h-full w-full top-0 left-0 pointer-events-none z-30"
                             >
