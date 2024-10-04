@@ -1,5 +1,6 @@
 use crate::error_template::{AppError, ErrorTemplate};
 
+use components::gamepad::Gamepad;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
@@ -75,6 +76,7 @@ pub fn App() -> impl IntoView {
                     }
                 }
             >
+                <Gamepad/>
                 <div
                     class="relative aspect-[1042/751] flex-shrink-0"
                     style=move || { if is_landscape.get() { "height:100%" } else { "width:100%" } }

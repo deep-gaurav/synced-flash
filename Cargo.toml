@@ -79,6 +79,8 @@ openssl = { version = "0.10", features = ["vendored"] }
 hmac = "0.12.1"
 sha1 = "0.10.6"
 
+svg = "0.18.0"
+
 [workspace.dependencies.ruffle_core]
 git = "https://github.com/deep-gaurav/ruffle.git"
 features = [

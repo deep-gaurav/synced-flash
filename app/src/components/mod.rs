@@ -1,5 +1,6 @@
 pub mod chatbox;
 pub mod dialog;
+pub mod gamepad;
 pub mod player;
 #[cfg(all(
     feature = "ruffle_web_common",

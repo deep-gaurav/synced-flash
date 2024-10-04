@@ -44,6 +44,8 @@ wasm-bindgen-futures.workspace = true
 serde.workspace = true
 bincode.workspace = true
 
+svg.workspace = true
+
 [features]
 default = []
 hydrate = [
