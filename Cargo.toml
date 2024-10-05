@@ -81,6 +81,8 @@ sha1 = "0.10.6"
 
 svg = "0.18.0"
 
+strum = { version = "0.26.3", features = ["derive"] }
+
 [workspace.dependencies.ruffle_core]
 git = "https://github.com/deep-gaurav/ruffle.git"
 features = [

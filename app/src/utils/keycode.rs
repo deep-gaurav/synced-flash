@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
+use strum::EnumIter;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, EnumIter)]
 pub enum Key {
     UpArrow,
     DownArrow,
@@ -38,6 +39,8 @@ pub enum Key {
 
     CtrlLeft,
     CtrlRight,
+
+    Enter,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -85,6 +88,7 @@ impl TryFrom<web_sys::KeyboardEvent> for Key {
             "ControlRight" => Ok(Key::CtrlRight),
 
             "Space" => Ok(Key::Space),
+            "Enter" => Ok(Key::Enter),
 
             "ArrowUp" => Ok(Key::UpArrow),
             "ArrowDown" => Ok(Key::DownArrow),
@@ -103,7 +107,9 @@ impl Key {
             Key::LeftArrow => "⬅️".to_string(),
             Key::RightArrow => "➡️".to_string(),
 
-            Key::Space => "".to_string(),
+            Key::Space => "␣".to_string(),
+            Key::Enter => "↵".to_string(),
+
             Key::A => "A".to_string(),
             Key::B => "B".to_string(),
             Key::C => "C".to_string(),
@@ -131,8 +137,8 @@ impl Key {
             Key::Y => "Y".to_string(),
             Key::Z => "Z".to_string(),
 
-            Key::CtrlLeft => "Ctrl".to_string(),
-            Key::CtrlRight => "Ctrl".to_string(),
+            Key::CtrlLeft => "Ctrl L".to_string(),
+            Key::CtrlRight => "Ctrl R".to_string(),
         }
     }
 }

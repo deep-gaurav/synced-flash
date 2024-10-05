@@ -25,6 +25,40 @@ body {
 }
 
 
+.hexagon {
+	--b: 10px;
+	/* adjust to control the border  */
+	aspect-ratio: cos(30deg);
+	clip-path:
+		polygon(50% 0, -50% 50%, 50% 100%, 150% 50%, 50% 0,
+			50% var(--b),
+			calc(100% - var(--b)*sin(60deg)) calc(25% + var(--b)*cos(60deg)),
+			calc(100% - var(--b)*sin(60deg)) calc(75% - var(--b)*cos(60deg)),
+			50% calc(100% - var(--b)),
+			calc(var(--b)*sin(60deg)) calc(75% - var(--b)*cos(60deg)),
+			calc(var(--b)*sin(60deg)) calc(25% + var(--b)*cos(60deg)),
+			50% var(--b));
+}
+
+.hexagon-selected {
+	--b: 20px;
+	/* adjust to control the border  */
+	aspect-ratio: cos(30deg);
+	clip-path:
+		polygon(50% 0, -50% 50%, 50% 100%, 150% 50%, 50% 0,
+			50% var(--b),
+			calc(100% - var(--b)*sin(60deg)) calc(25% + var(--b)*cos(60deg)),
+			calc(100% - var(--b)*sin(60deg)) calc(75% - var(--b)*cos(60deg)),
+			50% calc(100% - var(--b)),
+			calc(var(--b)*sin(60deg)) calc(75% - var(--b)*cos(60deg)),
+			calc(var(--b)*sin(60deg)) calc(25% + var(--b)*cos(60deg)),
+			50% var(--b));
+}
+
+.hexagon-filled {
+	clip-path: polygon(-50% 50%, 50% 100%, 150% 50%, 50% 0);
+}
+
 @font-face {
 	font-family: 'Compaq2x';
 	src: url('/assets/fonts/Web437_Compaq_Port3-2x.woff') format('woff');

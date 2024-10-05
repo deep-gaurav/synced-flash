@@ -46,6 +46,8 @@ bincode.workspace = true
 
 svg.workspace = true
 
+strum.workspace = true
+
 [features]
 default = []
 hydrate = [

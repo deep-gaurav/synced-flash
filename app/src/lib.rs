@@ -1,6 +1,6 @@
 use crate::error_template::{AppError, ErrorTemplate};
 
-use components::gamepad::Gamepad;
+use components::touchmanager::TouchManager;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
@@ -30,8 +30,10 @@ pub fn App() -> impl IntoView {
     provide_meta_context();
 
     let room_manager = RoomManager::new(Owner::current().unwrap());
+    let touch_manager = TouchManager::new();
 
     provide_context(room_manager);
+    provide_context(touch_manager);
 
     let handle_point = create_node_ref();
     let side_point = create_node_ref();
@@ -76,14 +78,13 @@ pub fn App() -> impl IntoView {
                     }
                 }
             >
-                <Gamepad/>
                 <div
                     class="relative aspect-[1042/751] flex-shrink-0"
                     style=move || { if is_landscape.get() { "height:100%" } else { "width:100%" } }
                 >
                     <div class="h-full w-full absolute bg-cover bg-center bg-no-repeat bg-[url('/assets/images/synced_crt.png')] z-10 pointer-events-none" />
                     <div class="absolute left-[7%] w-[68%] top-[11%] h-[79%] bg-slate-800">
-                        <div class="w-full h-full">
+                        <div ref=main_screen class="w-full h-full">
                             <Routes>
                                 <Route path="" view=HomePage />
                                 <Route path="room/:id" view=RoomPage />

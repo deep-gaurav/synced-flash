@@ -341,7 +341,9 @@ impl Key {
             Key::DownArrow => KeyCode::DOWN,
             Key::LeftArrow => KeyCode::LEFT,
             Key::RightArrow => KeyCode::RIGHT,
+
             Key::Space => KeyCode::SPACE,
+            Key::Enter => KeyCode::RETURN,
 
             Key::CtrlLeft => KeyCode::CONTROL,
             Key::CtrlRight => KeyCode::CONTROL,
