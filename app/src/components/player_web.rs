@@ -96,7 +96,7 @@ pub fn PlayerWeb(
                         .with_quality(quality)
                         .with_align(StageAlign::empty(), false)
                         .with_scale_mode(StageScaleMode::ShowAll, false)
-                        .with_frame_rate(Some(30.0))
+                        .with_frame_rate(None)
                         // // FIXME - should this be configurable?
                         .with_sandbox_type(SandboxType::LocalWithFile)
                         .with_page_url(Some("http://localhost/".to_string()));
