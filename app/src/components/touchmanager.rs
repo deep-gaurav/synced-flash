@@ -37,6 +37,14 @@ impl TouchManager {
                             }) {
                                 if notif.0 != element {
                                     notif.1.set(TouchEvent::TouchLeave);
+                                } else if let Some(notif) = listeners.with_value(|l| {
+                                    l.iter()
+                                        .find(|l: &&(Element, SignalSetter<TouchEvent>)| {
+                                            l.0 == element
+                                        })
+                                        .cloned()
+                                }) {
+                                    notif.1.set(TouchEvent::TouchEnter)
                                 }
                             }
                         } else if let Some(notif) = listeners.with_value(|l| {

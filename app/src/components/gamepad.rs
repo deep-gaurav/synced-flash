@@ -95,13 +95,8 @@ pub fn Gamepad(keys_sender: WriteSignal<Option<KeyEvent>>) -> impl IntoView {
     let (is_enabled, set_is_enabled) = create_signal(false);
     create_effect(move |_| {
         if let Some(key) = key_rx.get() {
-            info!("Ev {key:?}");
-
             if !is_editing_mode.get_untracked() {
-                info!("Sending");
                 keys_sender.set(Some(key));
-            } else {
-                info!("Not ending")
             }
         }
     });
@@ -189,7 +184,6 @@ pub fn Gamepad(keys_sender: WriteSignal<Option<KeyEvent>>) -> impl IntoView {
                                     }
                                 }
                                 on:touchmove=move|ev|{
-                                    info!("touch move");
                                     if is_editing_mode.get_untracked(){
                                         if let Some(previous_touch) = previous_touch.get_untracked() {
                                             let changed_touches = ev.changed_touches();
@@ -583,13 +577,13 @@ fn GamepadDPad(
 
     let path_class = move || {
         format!(
-        "fill-blue-800/75 duration-200 transition-all hover:fill-blue-900 active:fill-blue-950 {}",
-        if is_selected.get() {
-            "stroke-2 stroke-yellow-500"
-        } else {
-            ""
-        }
-    )
+            "fill-blue-700/65 duration-200 transition-all {}",
+            if is_selected.get() {
+                "stroke-2 stroke-yellow-500"
+            } else {
+                ""
+            }
+        )
     };
 
     let l_ref = create_node_ref::<leptos::svg::Path>();
@@ -597,19 +591,24 @@ fn GamepadDPad(
     let t_ref = create_node_ref::<leptos::svg::Path>();
     let b_ref = create_node_ref::<leptos::svg::Path>();
 
+    let (l_active, set_l_active) = create_signal(false);
+    let (r_active, set_r_active) = create_signal(false);
+    let (t_active, set_t_active) = create_signal(false);
+    let (b_active, set_b_active) = create_signal(false);
+
     create_effect(move |_| {
         if let (Some(l), Some(r), Some(t), Some(b)) =
             (l_ref.get(), r_ref.get(), t_ref.get(), b_ref.get())
         {
             let touch_manager = expect_context::<TouchManager>();
             let evs = vec![
-                (l, keys.get_untracked().0),
-                (r, keys.get_untracked().1),
-                (t, keys.get_untracked().2),
-                (b, keys.get_untracked().3),
+                (l, keys.get_untracked().0, set_l_active),
+                (r, keys.get_untracked().1, set_r_active),
+                (t, keys.get_untracked().2, set_t_active),
+                (b, keys.get_untracked().3, set_b_active),
             ];
 
-            for (el, key) in evs {
+            for (el, key, active_set) in evs {
                 touch_manager.register_listener(
                     {
                         let el: &Element = el.as_ref();
@@ -618,9 +617,11 @@ fn GamepadDPad(
                     SignalSetter::map(move |ev| match ev {
                         crate::components::touchmanager::TouchEvent::TouchEnter => {
                             key_tx.set(Some(KeyEvent::Down(key)));
+                            active_set.set(true);
                         }
                         crate::components::touchmanager::TouchEvent::TouchLeave => {
                             key_tx.set(Some(KeyEvent::Up(key)));
+                            active_set.set(false);
                         }
                     }),
                 );
@@ -676,16 +677,17 @@ fn GamepadDPad(
             //Left Fan
             <path
                 ref=l_ref
-                on:mousedown=move|_|{
-                    key_tx.set(Some(KeyEvent::Down(keys.get().0)));
-                }
-                on:mouseup=move|_|{
-                    key_tx.set(Some(KeyEvent::Up(keys.get().0)));
-                }
-                on:mouseleave=move|_|{
-                    key_tx.set(Some(KeyEvent::Up(keys.get().0)));
-                }
+                // on:mousedown=move|_|{
+                //     key_tx.set(Some(KeyEvent::Down(keys.get().0)));
+                // }
+                // on:mouseup=move|_|{
+                //     key_tx.set(Some(KeyEvent::Up(keys.get().0)));
+                // }
+                // on:mouseleave=move|_|{
+                //     key_tx.set(Some(KeyEvent::Up(keys.get().0)));
+                // }
                 class=path_class
+                class=("fill-blue-950/85", l_active)
                 d={left_fan}
                 mask="url(#mask1)"
             />
@@ -693,16 +695,17 @@ fn GamepadDPad(
             //Right Fan
             <path
                 ref=r_ref
-                on:mousedown=move|_|{
-                    key_tx.set(Some(KeyEvent::Down(keys.get().1)));
-                }
-                on:mouseup=move|_|{
-                    key_tx.set(Some(KeyEvent::Up(keys.get().1)));
-                }
-                on:mouseleave=move|_|{
-                    key_tx.set(Some(KeyEvent::Up(keys.get().1)));
-                }
+                // on:mousedown=move|_|{
+                //     key_tx.set(Some(KeyEvent::Down(keys.get().1)));
+                // }
+                // on:mouseup=move|_|{
+                //     key_tx.set(Some(KeyEvent::Up(keys.get().1)));
+                // }
+                // on:mouseleave=move|_|{
+                //     key_tx.set(Some(KeyEvent::Up(keys.get().1)));
+                // }
                 class=path_class
+                class=("fill-blue-950/85", r_active)
                 d={right_fan}
                 mask="url(#mask1)"
             />
@@ -710,17 +713,19 @@ fn GamepadDPad(
             //Top Fan
             <path
                 ref=t_ref
-                on:mousedown=move|_|{
-                    key_tx.set(Some(KeyEvent::Down(keys.get().2)));
-                }
-                on:mouseup=move|_|{
-                    key_tx.set(Some(KeyEvent::Up(keys.get().2)));
-                }
-                on:mouseleave=move|_|{
-                    key_tx.set(Some(KeyEvent::Up(keys.get().2)));
-                }
+                // on:mousedown=move|_|{
+                //     key_tx.set(Some(KeyEvent::Down(keys.get().2)));
+                // }
+                // on:mouseup=move|_|{
+                //     key_tx.set(Some(KeyEvent::Up(keys.get().2)));
+                // }
+                // on:mouseleave=move|_|{
+                //     key_tx.set(Some(KeyEvent::Up(keys.get().2)));
+                // }
 
                 class=path_class
+                class=("fill-blue-950/85", t_active)
+
                 d={top_fan}
                 mask="url(#mask1)"
             />
@@ -728,16 +733,18 @@ fn GamepadDPad(
             //Bottom Fan
             <path
                 ref=b_ref
-                on:mousedown=move|_|{
-                    key_tx.set(Some(KeyEvent::Down(keys.get().3)));
-                }
-                on:mouseup=move|_|{
-                    key_tx.set(Some(KeyEvent::Up(keys.get().3)));
-                }
-                on:mouseleave=move|_|{
-                    key_tx.set(Some(KeyEvent::Up(keys.get().3)));
-                }
+                // on:mousedown=move|_|{
+                //     key_tx.set(Some(KeyEvent::Down(keys.get().3)));
+                // }
+                // on:mouseup=move|_|{
+                //     key_tx.set(Some(KeyEvent::Up(keys.get().3)));
+                // }
+                // on:mouseleave=move|_|{
+                //     key_tx.set(Some(KeyEvent::Up(keys.get().3)));
+                // }
                 class=path_class
+                class=("fill-blue-950/85", b_active)
+
                 d={bottom_fan}
                 mask="url(#mask1)"
             />
@@ -776,22 +783,53 @@ fn SingleButton(
     key_tx: WriteSignal<Option<KeyEvent>>,
     is_selected: Memo<bool>,
 ) -> impl IntoView {
+    let div_ref = create_node_ref::<leptos::html::Div>();
+    let (is_active, set_is_active) = create_signal(false);
+    create_effect(move |_| {
+        if let Some(div) = div_ref.get() {
+            let touch_manager = expect_context::<TouchManager>();
+            let evs = vec![(div, key.get_untracked())];
+
+            for (el, key) in evs {
+                touch_manager.register_listener(
+                    {
+                        let el: &Element = el.as_ref();
+                        el.clone()
+                    },
+                    SignalSetter::map(move |ev| match ev {
+                        crate::components::touchmanager::TouchEvent::TouchEnter => {
+                            key_tx.set(Some(KeyEvent::Down(key)));
+                            set_is_active.set(true);
+                        }
+                        crate::components::touchmanager::TouchEvent::TouchLeave => {
+                            key_tx.set(Some(KeyEvent::Up(key)));
+                            set_is_active.set(false);
+                        }
+                    }),
+                );
+            }
+        }
+    });
+
     view! {
 
         <div class="w-full aspect-[cos(30deg)]">
 
 
             <div
-                on:mousedown=move|_|{
-                    key_tx.set(Some(KeyEvent::Down(key.get())));
-                }
-                on:mouseup=move|_|{
-                    key_tx.set(Some(KeyEvent::Up(key.get())));
-                }
-                on:mouseleave=move|_|{
-                    key_tx.set(Some(KeyEvent::Up(key.get())));
-                }
-                class="absolute hexagon-filled bg-blue-400/50 active:bg-blue-900 left-0 top-0 w-full h-full flex items-center justify-center">
+                ref=div_ref
+                // on:mousedown=move|_|{
+                //     key_tx.set(Some(KeyEvent::Down(key.get())));
+                // }
+                // on:mouseup=move|_|{
+                //     key_tx.set(Some(KeyEvent::Up(key.get())));
+                // }
+                // on:mouseleave=move|_|{
+                //     key_tx.set(Some(KeyEvent::Up(key.get())));
+                // }
+                class="absolute hexagon-filled bg-blue-400/50 left-0 top-0 w-full h-full flex items-center justify-center"
+                class=("bg-blue-900",is_active)
+                >
                 {
                     move || key.get().get_symbol()
                 }
