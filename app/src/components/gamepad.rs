@@ -591,21 +591,74 @@ fn GamepadDPad(
     let t_ref = create_node_ref::<leptos::svg::Path>();
     let b_ref = create_node_ref::<leptos::svg::Path>();
 
+    let tl_ref = create_node_ref::<leptos::svg::Path>();
+    let tr_ref = create_node_ref::<leptos::svg::Path>();
+    let bl_ref = create_node_ref::<leptos::svg::Path>();
+    let br_ref = create_node_ref::<leptos::svg::Path>();
+
     let (l_active, set_l_active) = create_signal(false);
     let (r_active, set_r_active) = create_signal(false);
     let (t_active, set_t_active) = create_signal(false);
     let (b_active, set_b_active) = create_signal(false);
 
+    let (tl_active, set_tl_active) = create_signal(false);
+    let (tr_active, set_tr_active) = create_signal(false);
+    let (bl_active, set_bl_active) = create_signal(false);
+    let (br_active, set_br_active) = create_signal(false);
+
     create_effect(move |_| {
-        if let (Some(l), Some(r), Some(t), Some(b)) =
-            (l_ref.get(), r_ref.get(), t_ref.get(), b_ref.get())
-        {
+        if let (Some(l), Some(r), Some(t), Some(b), Some(tl), Some(tr), Some(bl), Some(br)) = (
+            l_ref.get(),
+            r_ref.get(),
+            t_ref.get(),
+            b_ref.get(),
+            tl_ref.get(),
+            tr_ref.get(),
+            bl_ref.get(),
+            br_ref.get(),
+        ) {
             let touch_manager = expect_context::<TouchManager>();
             let evs = vec![
-                (l, keys.get_untracked().0, set_l_active),
-                (r, keys.get_untracked().1, set_r_active),
-                (t, keys.get_untracked().2, set_t_active),
-                (b, keys.get_untracked().3, set_b_active),
+                (
+                    l,
+                    Signal::derive(move || vec![keys.get_untracked().0]),
+                    set_l_active,
+                ),
+                (
+                    r,
+                    Signal::derive(move || vec![keys.get_untracked().1]),
+                    set_r_active,
+                ),
+                (
+                    t,
+                    Signal::derive(move || vec![keys.get_untracked().2]),
+                    set_t_active,
+                ),
+                (
+                    b,
+                    Signal::derive(move || vec![keys.get_untracked().3]),
+                    set_b_active,
+                ),
+                (
+                    tl,
+                    Signal::derive(move || vec![keys.get_untracked().0, keys.get_untracked().2]),
+                    set_tl_active,
+                ),
+                (
+                    tr,
+                    Signal::derive(move || vec![keys.get_untracked().1, keys.get_untracked().2]),
+                    set_tr_active,
+                ),
+                (
+                    bl,
+                    Signal::derive(move || vec![keys.get_untracked().0, keys.get_untracked().3]),
+                    set_bl_active,
+                ),
+                (
+                    br,
+                    Signal::derive(move || vec![keys.get_untracked().0, keys.get_untracked().3]),
+                    set_br_active,
+                ),
             ];
 
             for (el, key, active_set) in evs {
@@ -616,11 +669,15 @@ fn GamepadDPad(
                     },
                     SignalSetter::map(move |ev| match ev {
                         crate::components::touchmanager::TouchEvent::TouchEnter => {
-                            key_tx.set(Some(KeyEvent::Down(key)));
+                            for key in key.get_untracked().iter().cloned() {
+                                key_tx.set(Some(KeyEvent::Down(key)));
+                            }
                             active_set.set(true);
                         }
                         crate::components::touchmanager::TouchEvent::TouchLeave => {
-                            key_tx.set(Some(KeyEvent::Up(key)));
+                            for key in key.get_untracked().iter().cloned() {
+                                key_tx.set(Some(KeyEvent::Up(key)));
+                            }
                             active_set.set(false);
                         }
                     }),
@@ -751,24 +808,36 @@ fn GamepadDPad(
 
             //Top Left Fan
             <path
+                ref=tl_ref
+                class=("fill-blue-950/85", tl_active)
+
                 class=path_class
                 d={top_left_fan}
             />
 
             //Top Right Fan
             <path
+                ref=tr_ref
+                class=("fill-blue-950/85", tr_active)
+
                 class=path_class
                 d={top_right_fan}
             />
 
             //Bottom Left Fan
             <path
+                ref=bl_ref
+                class=("fill-blue-950/85", bl_active)
+
                 class=path_class
                 d={bottom_left_fan}
             />
 
             //Bottom Right Fan
             <path
+                ref=br_ref
+                class=("fill-blue-950/85", br_active)
+
                 class=path_class
                 d={bottom_right_fan}
             />
@@ -788,7 +857,7 @@ fn SingleButton(
     create_effect(move |_| {
         if let Some(div) = div_ref.get() {
             let touch_manager = expect_context::<TouchManager>();
-            let evs = vec![(div, key.get_untracked())];
+            let evs = vec![(div, key)];
 
             for (el, key) in evs {
                 touch_manager.register_listener(
@@ -798,11 +867,11 @@ fn SingleButton(
                     },
                     SignalSetter::map(move |ev| match ev {
                         crate::components::touchmanager::TouchEvent::TouchEnter => {
-                            key_tx.set(Some(KeyEvent::Down(key)));
+                            key_tx.set(Some(KeyEvent::Down(key.get_untracked())));
                             set_is_active.set(true);
                         }
                         crate::components::touchmanager::TouchEvent::TouchLeave => {
-                            key_tx.set(Some(KeyEvent::Up(key)));
+                            key_tx.set(Some(KeyEvent::Up(key.get_untracked())));
                             set_is_active.set(false);
                         }
                     }),
