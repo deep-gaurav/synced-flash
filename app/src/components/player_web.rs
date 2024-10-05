@@ -99,7 +99,7 @@ pub fn PlayerWeb(
                         .with_frame_rate(Some(30.0))
                         // // FIXME - should this be configurable?
                         .with_sandbox_type(SandboxType::LocalWithFile)
-                        .with_page_url(window().location().href().ok());
+                        .with_page_url(Some("http://localhost/".to_string()));
                     #[cfg(feature = "ruffle_video_software")]
                     {
                         use ruffle_video_software::backend::SoftwareVideoBackend;
